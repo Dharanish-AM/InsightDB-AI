@@ -32,20 +32,23 @@ export const Navbar: React.FC<NavbarProps> = ({
               <Sparkles className="w-5 h-5 text-white" />
             </div>
             <div>
-              <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white via-gray-200 to-indigo-300" style={{ backgroundImage: theme === 'light' ? 'linear-gradient(to right, #1e1b4b, #312e81, #4f46e5)' : undefined }}>
+              <span
+                className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white via-gray-200 to-indigo-300"
+                style={{ backgroundImage: theme === 'light' ? 'linear-gradient(to right, #0f172a, #1e1b4b, #4338ca)' : undefined }}
+              >
                 InsightDB AI
               </span>
-              <span className="block text-xs text-indigo-400 font-medium tracking-wide">Autonomous SQL Agent</span>
+              <span className="block text-xs font-medium tracking-wide" style={{ color: 'var(--text-secondary)' }}>Autonomous SQL Agent</span>
             </div>
           </div>
 
-          <nav className="flex items-center space-x-1 p-1.5 rounded-xl border" style={{ background: 'var(--bg-tag)', borderColor: 'var(--border-base)' }}>
+          <nav className="flex items-center space-x-1 p-1 rounded-xl border" style={{ background: 'var(--bg-tag)', borderColor: 'var(--border-base)' }}>
             <button
               onClick={() => setActiveTab('studio')}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all ${
                 activeTab === 'studio'
                   ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                  : 'hover:bg-black/10 dark:hover:bg-white/10'
+                  : 'hover:bg-black/5 dark:hover:bg-white/5'
               }`}
               style={activeTab !== 'studio' ? { color: 'var(--text-secondary)' } : {}}
             >
@@ -55,10 +58,10 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             <button
               onClick={() => setActiveTab('connections')}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all ${
                 activeTab === 'connections'
                   ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                  : 'hover:bg-black/10 dark:hover:bg-white/10'
+                  : 'hover:bg-black/5 dark:hover:bg-white/5'
               }`}
               style={activeTab !== 'connections' ? { color: 'var(--text-secondary)' } : {}}
             >
@@ -68,10 +71,10 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             <button
               onClick={() => setActiveTab('schema')}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all ${
                 activeTab === 'schema'
                   ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                  : 'hover:bg-black/10 dark:hover:bg-white/10'
+                  : 'hover:bg-black/5 dark:hover:bg-white/5'
               }`}
               style={activeTab !== 'schema' ? { color: 'var(--text-secondary)' } : {}}
             >
