@@ -1,5 +1,4 @@
-from typing import List, Union
-from pydantic import AnyHttpUrl, validator
+from typing import List
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -9,22 +8,20 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
-    
-    # Security
+
     SECRET_KEY: str = "super-secret-key-change-this-in-production"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8  # 8 days
-    
-    # CORS
+    ENCRYPTION_KEY: str = "MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE="
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8
+    REFRESH_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 30
+
     CORS_ORIGINS: List[str] = [
         "http://localhost:5173",
         "http://localhost:3000",
         "http://127.0.0.1:5173",
     ]
-    
-    # Application DB (PostgreSQL)
-    DATABASE_URL: str = "postgresql://insightdb:insightdb_pass@localhost:5432/insightdb_dev"
-    
-    # Cache / Redis
+
+    DATABASE_URL: str = "postgresql+asyncpg://insightdb:insightdb_pass@localhost:5432/insightdb_dev"
     REDIS_URL: str = "redis://localhost:6379/0"
 
     model_config = SettingsConfigDict(
