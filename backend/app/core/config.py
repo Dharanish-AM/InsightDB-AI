@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8
     REFRESH_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 30
+
+    OPENAI_API_KEY: Optional[str] = None
+    OPENAI_BASE_URL: str = "http://localhost:11434/v1"
+    LLM_MODEL_NAME: str = "llama3.1"
 
     CORS_ORIGINS: List[str] = [
         "http://localhost:5173",

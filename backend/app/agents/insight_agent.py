@@ -2,6 +2,7 @@ import json
 import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from app.core.config import settings
 from app.schemas.insight import (
     AnomalyHighlight,
     InsightGenerateResponse,
@@ -83,13 +84,13 @@ class InsightAgent:
         columns: List[str],
         rows: List[Dict[str, Any]]
     ) -> InsightGenerateResponse:
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            return self._fallback_insights(user_query, columns, rows)
+        api_key = os.getenv("OPENAI_API_KEY", settings.OPENAI_API_KEY)
+        base_url = os.getenv("OPENAI_BASE_URL", settings.OPENAI_BASE_URL)
+        model_name = os.getenv("LLM_MODEL_NAME", settings.LLM_MODEL_NAME)
 
         try:
             import openai
-            client = openai.AsyncOpenAI(api_key=api_key)
+            client = openai.AsyncOpenAI(api_key=api_key, base_url=base_url)
             rows_sample = json.dumps(rows[:100], indent=2, default=str)
             formatted_prompt = self.prompt_template.format(
                 user_query=user_query or "N/A",
@@ -98,7 +99,7 @@ class InsightAgent:
                 rows_sample=rows_sample
             )
             response = await client.chat.completions.create(
-                model="gpt-4o-mini",
+                model=model_name,
                 messages=[
                     {"role": "user", "content": formatted_prompt}
                 ],

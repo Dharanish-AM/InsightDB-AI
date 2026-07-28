@@ -2,6 +2,7 @@ import json
 import os
 from pathlib import Path
 from typing import List, Optional
+from app.core.config import settings
 from app.schemas.planner import QueryExecutionPlan
 from app.schemas.sql_generator import SqlGenerateResponse
 
@@ -92,7 +93,10 @@ class SqlAgent:
         dialect: str,
         connection_id: int
     ) -> SqlGenerateResponse:
-        api_key = os.getenv("OPENAI_API_KEY")
+        api_key = os.getenv("OPENAI_API_KEY", settings.OPENAI_API_KEY)
+        base_url = os.getenv("OPENAI_BASE_URL", settings.OPENAI_BASE_URL)
+        model_name = os.getenv("LLM_MODEL_NAME", settings.LLM_MODEL_NAME)
+
         if not api_key:
             res = self._build_deterministic_sql(plan, dialect)
             res.connection_id = connection_id
@@ -100,13 +104,13 @@ class SqlAgent:
 
         try:
             import openai
-            client = openai.AsyncOpenAI(api_key=api_key)
+            client = openai.AsyncOpenAI(api_key=api_key, base_url=base_url)
             formatted_prompt = self.prompt_template.format(
                 dialect=dialect,
                 execution_plan=plan.model_dump_json(indent=2)
             )
             response = await client.chat.completions.create(
-                model="gpt-4o-mini",
+                model=model_name,
                 messages=[
                     {"role": "user", "content": formatted_prompt}
                 ],

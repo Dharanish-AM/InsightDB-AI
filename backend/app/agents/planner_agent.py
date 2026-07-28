@@ -2,6 +2,7 @@ import json
 import os
 from pathlib import Path
 from typing import Optional
+from app.core.config import settings
 from app.schemas.planner import (
     FilterConditionSpec,
     JoinPathSpec,
@@ -23,7 +24,7 @@ class PlannerAgent:
     def _fallback_plan(self, user_query: str, schema_context: str) -> QueryExecutionPlan:
         q_lower = user_query.lower()
         target_tables = []
-        
+
         for line in schema_context.split("\n"):
             if line.startswith("## Table:"):
                 t_name = line.split("## Table:")[1].split("(")[0].strip()
@@ -51,24 +52,27 @@ class PlannerAgent:
             limit=100
         )
 
-    async def generate_plan(
+    async def create_plan(
         self,
         user_query: str,
         schema_context: str
     ) -> QueryExecutionPlan:
-        api_key = os.getenv("OPENAI_API_KEY")
+        api_key = os.getenv("OPENAI_API_KEY", settings.OPENAI_API_KEY)
+        base_url = os.getenv("OPENAI_BASE_URL", settings.OPENAI_BASE_URL)
+        model_name = os.getenv("LLM_MODEL_NAME", settings.LLM_MODEL_NAME)
+
         if not api_key:
             return self._fallback_plan(user_query, schema_context)
 
         try:
             import openai
-            client = openai.AsyncOpenAI(api_key=api_key)
+            client = openai.AsyncOpenAI(api_key=api_key, base_url=base_url)
             formatted_prompt = self.prompt_template.format(
                 schema_context=schema_context,
                 user_query=user_query
             )
             response = await client.chat.completions.create(
-                model="gpt-4o-mini",
+                model=model_name,
                 messages=[
                     {"role": "user", "content": formatted_prompt}
                 ],
@@ -80,6 +84,8 @@ class PlannerAgent:
             return QueryExecutionPlan.model_validate(data)
         except Exception:
             return self._fallback_plan(user_query, schema_context)
+
+    generate_plan = create_plan
 
 
 planner_agent = PlannerAgent()
