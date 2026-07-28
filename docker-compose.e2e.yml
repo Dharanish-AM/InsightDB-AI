@@ -1,0 +1,4 @@
+services:
+  backend:
+    environment:
+      - SKIP_LLM_TESTS=true
