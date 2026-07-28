@@ -14,7 +14,7 @@ def _register_and_login(page: Page) -> str:
     page.get_by_placeholder("name@company.com").fill(email)
     page.get_by_placeholder("••••••••").fill("Password123!")
     page.get_by_role("button", name="Create Account").click()
-    expect(page.get_by_text("Query Studio")).to_be_visible(timeout=10000)
+    expect(page.get_by_role("button", name="Ask Insight")).to_be_visible(timeout=10000)
     return email
 
 
@@ -39,14 +39,14 @@ def _add_connection(page: Page, conn_name: str):
 @pytest.mark.browser
 def test_query_studio_tab_is_default(page: Page):
     _register_and_login(page)
-    expect(page.get_by_text("Select a Database Connection")).to_be_visible(timeout=5000)
+    expect(page.get_by_text("Start with a data source")).to_be_visible(timeout=5000)
 
 
 @pytest.mark.browser
 def test_query_studio_shows_no_connection_prompt(page: Page):
     _register_and_login(page)
-    page.get_by_role("button", name="Query Studio").click()
-    expect(page.get_by_text("Select a Database Connection")).to_be_visible(timeout=5000)
+    page.get_by_role("button", name="Ask Insight").click()
+    expect(page.get_by_text("Start with a data source")).to_be_visible(timeout=5000)
 
 
 @pytest.mark.browser
@@ -55,7 +55,7 @@ def test_query_studio_shows_input_when_connection_selected(page: Page):
     conn_name = f"Studio DB {uuid.uuid4().hex[:4]}"
     _add_connection(page, conn_name)
 
-    page.get_by_role("button", name="Query Studio").click()
+    page.get_by_role("button", name="Ask Insight").click()
 
     selector = page.locator("select").first
     selector.select_option(label=lambda s: conn_name in s)
@@ -72,7 +72,7 @@ def test_ask_button_disabled_without_prompt(page: Page):
     conn_name = f"Studio DB {uuid.uuid4().hex[:4]}"
     _add_connection(page, conn_name)
 
-    page.get_by_role("button", name="Query Studio").click()
+    page.get_by_role("button", name="Ask Insight").click()
     selector = page.locator("select").first
     selector.select_option(label=lambda s: conn_name in s)
 
@@ -88,7 +88,7 @@ def test_submit_query_shows_result(page: Page):
     conn_name = f"Studio DB {uuid.uuid4().hex[:4]}"
     _add_connection(page, conn_name)
 
-    page.get_by_role("button", name="Query Studio").click()
+    page.get_by_role("button", name="Ask Insight").click()
     selector = page.locator("select").first
     selector.select_option(label=lambda s: conn_name in s)
 

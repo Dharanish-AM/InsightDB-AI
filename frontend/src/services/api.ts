@@ -80,6 +80,17 @@ export const api = {
     return res.json();
   },
 
+  async updateConnection(connectionId: number, conn: Partial<Omit<DatabaseConnection, 'id' | 'is_active' | 'created_at'>> & { password?: string }): Promise<DatabaseConnection> {
+    const res = await fetch(`${API_BASE}/databases/${connectionId}`, { method: 'PUT', headers: getHeaders(), body: JSON.stringify(conn) });
+    if (!res.ok) { const err = await res.json(); throw new Error(err.detail || 'Failed to update database connection'); }
+    return res.json();
+  },
+
+  async deleteConnection(connectionId: number): Promise<void> {
+    const res = await fetch(`${API_BASE}/databases/${connectionId}`, { method: 'DELETE', headers: getHeaders() });
+    if (!res.ok) { const err = await res.json(); throw new Error(err.detail || 'Failed to delete database connection'); }
+  },
+
   async testConnection(conn: Omit<DatabaseConnection, 'id' | 'is_active' | 'created_at'> & { password: string }) {
     const res = await fetch(`${API_BASE}/databases/test-connection`, {
       method: 'POST',
@@ -90,6 +101,12 @@ export const api = {
       const err = await res.json();
       throw new Error(err.detail || 'Connection test failed');
     }
+    return res.json();
+  },
+
+  async testSavedConnection(connectionId: number) {
+    const res = await fetch(`${API_BASE}/databases/${connectionId}/test`, { method: 'POST', headers: getHeaders() });
+    if (!res.ok) { const err = await res.json(); throw new Error(err.detail || 'Connection test failed'); }
     return res.json();
   },
 

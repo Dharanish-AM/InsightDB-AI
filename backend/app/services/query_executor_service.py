@@ -2,6 +2,8 @@ import asyncio
 import time
 from typing import Any, Dict, List
 from fastapi import HTTPException, status
+import sqlglot
+from sqlglot import exp
 from sqlalchemy import text
 from app.agents.validator_agent import validator_agent
 from app.core.encryption import decrypt_string
@@ -15,8 +17,38 @@ from app.services.connection_manager import connection_manager
 
 
 class QueryExecutorService:
+    # Results are shown in a browser and passed to the insight model. Never
+    # allow commonly named credential fields to leave this service.
+    SENSITIVE_COLUMN_TOKENS = (
+        "password", "passwd", "secret", "token", "api_key", "apikey",
+        "private_key", "access_key", "credential", "authorization",
+        "username", "host", "hostname", "database_name", "connection_uri",
+    )
+
     def __init__(self, connection_repo: ConnectionRepository):
         self.connection_repo = connection_repo
+
+    @classmethod
+    def _is_sensitive_column(cls, name: str) -> bool:
+        normalized = name.lower().replace("-", "_").replace(" ", "_")
+        return any(token in normalized for token in cls.SENSITIVE_COLUMN_TOKENS)
+
+    @classmethod
+    def _sensitive_output_aliases(cls, sql: str) -> List[str]:
+        """Find sensitive SELECT expressions even when they were aliased."""
+        try:
+            select = sqlglot.parse_one(sql).find(exp.Select)
+            if not select:
+                return []
+            return [
+                expression.alias_or_name
+                for expression in select.expressions
+                if any(cls._is_sensitive_column(column.name) for column in expression.find_all(exp.Column))
+            ]
+        except Exception:
+            # Header-based filtering below remains the fail-safe for SELECT *
+            # and for dialects sqlglot cannot parse here.
+            return []
 
     async def execute_query(
         self,
@@ -82,9 +114,16 @@ class QueryExecutorService:
             keys, rows_raw = await asyncio.wait_for(_run_query(), timeout=timeout_sec)
             latency_ms = (time.perf_counter() - start_time) * 1000.0
 
-            columns = [ColumnHeader(name=k) for k in keys]
+            aliased_sensitive_fields = self._sensitive_output_aliases(sanitized_sql)
+            omitted_columns = [
+                key for key in keys
+                if self._is_sensitive_column(key) or key in aliased_sensitive_fields
+            ]
+            visible_keys = [key for key in keys if key not in omitted_columns]
+            columns = [ColumnHeader(name=k) for k in visible_keys]
             formatted_rows: List[Dict[str, Any]] = [
-                {k: (str(v) if not isinstance(v, (int, float, bool, type(None))) else v) for k, v in zip(keys, row)}
+                {k: (str(v) if not isinstance(v, (int, float, bool, type(None))) else v)
+                 for k, v in zip(keys, row) if k in visible_keys}
                 for row in rows_raw
             ]
 
@@ -94,6 +133,7 @@ class QueryExecutorService:
                 columns=columns,
                 rows=formatted_rows,
                 row_count=len(formatted_rows),
+                omitted_columns=omitted_columns,
                 execution_time_ms=round(latency_ms, 2),
                 sanitized_sql=sanitized_sql,
                 error=None

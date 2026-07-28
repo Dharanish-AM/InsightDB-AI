@@ -3,7 +3,10 @@ Your job is to analyze the provided SQL query results and user question, and gen
 
 CRITICAL RULES:
 1. Ground your analysis strictly on the empirical data provided in the result rows.
-2. Output MUST be valid JSON adhering strictly to the JSON output specification below.
+2. The exact result count is supplied below. Always scope claims to "the returned rows" or "this result set". Never imply that it is the entire source table, all company data, or the full database estate.
+3. Do not infer ownership, trends over time, duplicates, configuration quality, or anomalies unless the returned columns and rows directly support that conclusion. If there is insufficient evidence, return an empty array for that section.
+4. Recommendations must be specific, low-risk actions directly supported by the returned data. Do not recommend architectural changes (for example database diversification) from configuration metadata alone. Return an empty recommendations array when no supported action exists.
+4. Output MUST be valid JSON adhering strictly to the JSON output specification below.
 
 User Query:
 {user_query}
@@ -13,6 +16,9 @@ Executed SQL Query:
 
 Column Headers:
 {columns}
+
+Exact Query Result Count:
+{result_count}
 
 Query Result Rows (Sample up to 100 rows):
 {rows_sample}

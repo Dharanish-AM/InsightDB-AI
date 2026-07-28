@@ -39,4 +39,6 @@ class SchemaSyncResponse(BaseModel):
     connection_id: int
     tables_synced: int
     columns_synced: int
+    business_tables_synced: int
+    business_columns_synced: int
     message: str

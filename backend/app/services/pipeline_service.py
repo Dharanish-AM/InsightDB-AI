@@ -39,6 +39,19 @@ class PipelineService:
 
         context_res = await self.metadata_service.build_prompt_context(conn.id, owner_id)
         schema_context = context_res.prompt_context
+        # A planner cannot safely select a table until the connection has been
+        # inspected.  In particular, never allow the planner's placeholder
+        # (``default_table``) to progress to query execution.
+        if not planner_agent._schema_columns(schema_context):
+            return PipelineAskResponse(
+                success=False,
+                connection_id=conn.id,
+                user_query=request.user_query,
+                error=(
+                    "Schema metadata is not available for this connection. "
+                    "Sync the schema in Data catalog, then ask your question again."
+                )
+            )
         dialect_str = conn.db_type.value if hasattr(conn.db_type, "value") else str(conn.db_type)
 
         try:

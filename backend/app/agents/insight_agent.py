@@ -96,6 +96,7 @@ class InsightAgent:
                 user_query=user_query or "N/A",
                 sql_query=sql_query or "N/A",
                 columns=", ".join(columns),
+                result_count=len(rows),
                 rows_sample=rows_sample
             )
             response = await client.chat.completions.create(
@@ -104,7 +105,7 @@ class InsightAgent:
                     {"role": "user", "content": formatted_prompt}
                 ],
                 response_format={"type": "json_object"},
-                temperature=0.2
+                temperature=0
             )
             content = response.choices[0].message.content
             data = json.loads(content)

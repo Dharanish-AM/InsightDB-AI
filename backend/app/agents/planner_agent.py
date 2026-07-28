@@ -1,7 +1,8 @@
 import json
 import os
+import re
 from pathlib import Path
-from typing import Optional
+from typing import Dict, Optional, Set
 from app.core.config import settings
 from app.schemas.planner import (
     FilterConditionSpec,
@@ -34,11 +35,23 @@ class PlannerAgent:
         if not target_tables:
             target_tables = ["default_table"]
 
+        # Listing requests should return rows, rather than an arbitrary count.  This
+        # is also the safe fallback when an LLM plan mentions schema fields that do
+        # not exist in the synced connection metadata.
+        is_listing_request = any(
+            phrase in q_lower
+            for phrase in ("show", "list", "display", "get all", "retrieve all")
+        )
+        is_aggregate_request = any(
+            phrase in q_lower
+            for phrase in ("how many", "count", "total", "average", "sum")
+        )
+
         return QueryExecutionPlan(
             intent_summary=f"Query intent derived for: {user_query}",
             target_tables=target_tables[:2],
             join_paths=[],
-            metrics=[
+            metrics=[] if is_listing_request and not is_aggregate_request else [
                 MetricAggregationSpec(
                     expression="COUNT(*)",
                     alias="total_records",
@@ -49,8 +62,56 @@ class PlannerAgent:
             filters=[],
             group_by=[],
             sort_by=[],
-            limit=100
+            limit=1000
         )
+
+    @staticmethod
+    def _schema_columns(schema_context: str) -> Dict[str, Set[str]]:
+        """Parse the compact prompt context into table-to-column lookup data."""
+        tables: Dict[str, Set[str]] = {}
+        current_table: Optional[str] = None
+        for line in schema_context.splitlines():
+            table_match = re.match(r"^## Table:\s*([^\s(]+)", line)
+            if table_match:
+                current_table = table_match.group(1)
+                tables[current_table] = set()
+                continue
+            column_match = re.match(r"^\s*-\s*([^:\s]+):", line)
+            if current_table and column_match:
+                tables[current_table].add(column_match.group(1))
+        return tables
+
+    @classmethod
+    def _plan_matches_schema(cls, plan: QueryExecutionPlan, schema_context: str) -> bool:
+        """Reject LLM plans that reference tables or fields absent from metadata."""
+        tables = cls._schema_columns(schema_context)
+        if not tables or any(table not in tables for table in plan.target_tables):
+            return False
+
+        selected_tables = set(plan.target_tables)
+        selected_tables.update(join.target_table for join in plan.join_paths)
+        if any(table not in tables for table in selected_tables):
+            return False
+
+        def has_column(reference: str) -> bool:
+            # Aliases (for example, a COUNT alias in ORDER BY) are not schema
+            # columns and are intentionally handled by the caller.
+            parts = reference.split(".")
+            if len(parts) == 2:
+                return parts[0] in tables and parts[1] in tables[parts[0]]
+            return any(reference in tables[table] for table in selected_tables)
+
+        for filter_spec in plan.filters:
+            if not has_column(filter_spec.column):
+                return False
+        for column in [*plan.dimensions, *plan.group_by]:
+            if not has_column(column):
+                return False
+        metric_aliases = {metric.alias for metric in plan.metrics}
+        for sort in plan.sort_by:
+            if sort.column not in metric_aliases and not has_column(sort.column):
+                return False
+        return True
 
     async def create_plan(
         self,
@@ -81,7 +142,10 @@ class PlannerAgent:
             )
             content = response.choices[0].message.content
             data = json.loads(content)
-            return QueryExecutionPlan.model_validate(data)
+            plan = QueryExecutionPlan.model_validate(data)
+            if self._plan_matches_schema(plan, schema_context):
+                return plan
+            return self._fallback_plan(user_query, schema_context)
         except Exception:
             return self._fallback_plan(user_query, schema_context)
 

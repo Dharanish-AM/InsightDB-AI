@@ -2,7 +2,7 @@ import pytest
 from httpx import AsyncClient
 from app.agents.planner_agent import planner_agent
 from app.repositories.schema_repository import SchemaRepository
-from app.schemas.planner import QueryExecutionPlan
+from app.schemas.planner import FilterConditionSpec, QueryExecutionPlan
 from app.services.schema_inspector import ColumnMetadata, TableMetadata
 
 
@@ -25,6 +25,30 @@ Columns:
     assert isinstance(plan, QueryExecutionPlan)
     assert len(plan.target_tables) >= 1
     assert "SELECT" not in plan.intent_summary.upper()
+
+
+def test_planner_rejects_hallucinated_column_and_falls_back_to_listing():
+    schema_context = """# Database Schema Context
+
+## Table: database_connections
+Columns:
+  - id: INTEGER [PRIMARY KEY]
+  - name: VARCHAR
+  - is_active: BOOLEAN
+"""
+    invalid_plan = QueryExecutionPlan(
+        intent_summary="List active connections",
+        target_tables=["database_connections"],
+        filters=[FilterConditionSpec(column="connection_status", operator="=", value="active")],
+    )
+
+    assert not planner_agent._plan_matches_schema(invalid_plan, schema_context)
+
+    fallback = planner_agent._fallback_plan("Show all database connections", schema_context)
+    assert fallback.target_tables == ["database_connections"]
+    assert fallback.filters == []
+    assert fallback.metrics == []
+    assert fallback.limit == 1000
 
 
 @pytest.mark.asyncio

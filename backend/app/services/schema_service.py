@@ -12,6 +12,18 @@ from app.services.schema_inspector import schema_inspector_service
 
 
 class SchemaService:
+    # InsightDB's own operational tables are not part of the customer's data
+    # catalog. Keeping them out of this API also avoids disclosing connection
+    # infrastructure and credential-field names to the browser.
+    INTERNAL_TABLES = {
+        "database_connections", "schema_tables", "schema_columns",
+        "column_annotations", "table_annotations", "users",
+        "business_metadata",
+    }
+    SENSITIVE_COLUMN_TOKENS = (
+        "password", "passwd", "secret", "token", "api_key", "apikey",
+        "private_key", "access_key", "credential", "authorization",
+    )
     def __init__(
         self,
         schema_repo: SchemaRepository,
@@ -57,12 +69,29 @@ class SchemaService:
                 connection_id=conn.id,
                 tables_metadata=tables_metadata
             )
+            business_tables = [
+                table for table in tables_metadata
+                if not self._is_internal_table(table.table_name)
+            ]
+            business_columns_count = sum(
+                sum(
+                    not self._is_sensitive_column(column.column_name)
+                    for column in table.columns
+                )
+                for table in business_tables
+            )
             return SchemaSyncResponse(
                 success=True,
                 connection_id=conn.id,
                 tables_synced=tables_count,
                 columns_synced=columns_count,
-                message=f"Successfully synchronized schema with {tables_count} tables and {columns_count} columns."
+                business_tables_synced=len(business_tables),
+                business_columns_synced=business_columns_count,
+                message=(
+                    f"Inspected {tables_count} tables and {columns_count} columns; "
+                    f"{len(business_tables)} business tables and {business_columns_count} "
+                    "safe columns are available in the catalog."
+                )
             )
         except Exception as err:
             raise HTTPException(
@@ -77,7 +106,7 @@ class SchemaService:
     ) -> List[SchemaDetailResponse]:
         await self._verify_connection_owner(connection_id, owner_id)
         tables = await self.schema_repo.get_tables_by_connection(connection_id)
-        return [SchemaDetailResponse.model_validate(t) for t in tables]
+        return [self._safe_table_response(t) for t in tables if not self._is_internal_table(t.table_name)]
 
     async def get_table_detail(
         self,
@@ -92,4 +121,27 @@ class SchemaService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Table '{table_name}' not found in schema metadata."
             )
-        return SchemaDetailResponse.model_validate(table)
+        if self._is_internal_table(table.table_name):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Table '{table_name}' is not available in the data catalog."
+            )
+        return self._safe_table_response(table)
+
+    @classmethod
+    def _is_internal_table(cls, table_name: str) -> bool:
+        return table_name.lower() in cls.INTERNAL_TABLES
+
+    @classmethod
+    def _is_sensitive_column(cls, column_name: str) -> bool:
+        normalized = column_name.lower().replace("-", "_").replace(" ", "_")
+        return any(token in normalized for token in cls.SENSITIVE_COLUMN_TOKENS)
+
+    @classmethod
+    def _safe_table_response(cls, table) -> SchemaDetailResponse:
+        response = SchemaDetailResponse.model_validate(table)
+        response.columns = [
+            column for column in response.columns
+            if not cls._is_sensitive_column(column.column_name)
+        ]
+        return response

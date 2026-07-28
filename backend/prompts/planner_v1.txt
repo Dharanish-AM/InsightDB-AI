@@ -5,6 +5,8 @@ CRITICAL RULES:
 1. DO NOT generate any raw SQL code or SQL statements under any circumstances.
 2. Identify target tables, columns, aggregations, metrics, filters, sorting criteria, and row limit required to answer the user request.
 3. Output MUST be valid JSON adhering strictly to the required schema.
+4. Use only table and column names that appear verbatim in the Schema Context. Never infer or rename a column (for example, do not substitute `status` for `is_active`).
+5. Add filters only when the user explicitly asks to restrict the result. For a request to show or list all records, return no filters.
 
 Schema Context:
 {schema_context}
@@ -32,13 +34,7 @@ JSON Output Specification:
     }}
   ],
   "dimensions": ["table1.category"],
-  "filters": [
-    {{
-      "column": "table1.status",
-      "operator": "=",
-      "value": "active"
-    }}
-  ],
+  "filters": [],
   "group_by": ["table1.category"],
   "sort_by": [
     {{

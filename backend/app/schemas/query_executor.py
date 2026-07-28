@@ -20,6 +20,9 @@ class QueryExecuteResponse(BaseModel):
     columns: List[ColumnHeader] = []
     rows: List[Dict[str, Any]] = []
     row_count: int = 0
+    # Names of result fields omitted before the response is sent to the
+    # browser (for example, passwords and API tokens).
+    omitted_columns: List[str] = []
     execution_time_ms: float = 0.0
     sanitized_sql: Optional[str] = None
     error: Optional[str] = None

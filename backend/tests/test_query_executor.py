@@ -1,6 +1,20 @@
 import pytest
 from httpx import AsyncClient
 from app.schemas.query_executor import QueryExecuteRequest, QueryExecuteResponse
+from app.services.query_executor_service import QueryExecutorService
+
+
+def test_sensitive_result_columns_are_identified():
+    assert QueryExecutorService._is_sensitive_column("encrypted_password")
+    assert QueryExecutorService._is_sensitive_column("apiToken")
+    assert QueryExecutorService._is_sensitive_column("database_name")
+    assert not QueryExecutorService._is_sensitive_column("order_total")
+
+
+def test_sensitive_columns_cannot_be_exposed_with_an_alias():
+    assert QueryExecutorService._sensitive_output_aliases(
+        "SELECT encrypted_password AS value, name FROM connections"
+    ) == ["value"]
 
 
 @pytest.mark.asyncio

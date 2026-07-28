@@ -86,6 +86,7 @@ export interface QueryExecuteResponse {
   columns: ColumnHeader[];
   rows: Record<string, any>[];
   row_count: number;
+  omitted_columns: string[];
   execution_time_ms: number;
   sanitized_sql?: string;
   error?: string;

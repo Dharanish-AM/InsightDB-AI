@@ -81,3 +81,45 @@ async def test_pipeline_ask_api_endpoint(async_client: AsyncClient, db_session):
     assert data["connection_id"] == conn_id
     assert data["user_query"] == "Calculate total order amounts"
     assert "error" in data or "plan" in data
+
+
+@pytest.mark.asyncio
+async def test_pipeline_requires_schema_metadata_before_querying(async_client: AsyncClient):
+    await async_client.post(
+        "/api/v1/auth/register",
+        json={"email": "pipeline_empty_schema@example.com", "password": "Password123!"}
+    )
+    login_res = await async_client.post(
+        "/api/v1/auth/login",
+        json={"email": "pipeline_empty_schema@example.com", "password": "Password123!"}
+    )
+    headers = {"Authorization": f"Bearer {login_res.json()['access_token']}"}
+    create_res = await async_client.post(
+        "/api/v1/databases/",
+        headers=headers,
+        json={
+            "name": "Unsynced DB",
+            "db_type": "postgresql",
+            "host": "localhost",
+            "port": 5432,
+            "database_name": "unsynced",
+            "username": "user",
+            "password": "password"
+        }
+    )
+
+    ask_res = await async_client.post(
+        "/api/v1/pipeline/ask",
+        headers=headers,
+        json={
+            "connection_id": create_res.json()["id"],
+            "user_query": "Show all database connections"
+        }
+    )
+
+    assert ask_res.status_code == 200
+    data = ask_res.json()
+    assert data["success"] is False
+    assert data["plan"] is None
+    assert data["sql_generated"] is None
+    assert "Sync the schema" in data["error"]
