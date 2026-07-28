@@ -47,6 +47,7 @@ frontend/build/
 .idea/
 *.swp
 *.swo
+pyrightconfig.json
 
 # OS
 .DS_Store
