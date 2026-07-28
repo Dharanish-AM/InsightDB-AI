@@ -42,7 +42,7 @@ services:
     environment:
       - ENVIRONMENT=development
       - DEBUG=True
-      - DATABASE_URL=postgresql://insightdb:insightdb_pass@postgres:5432/insightdb_dev
+      - DATABASE_URL=postgresql+asyncpg://insightdb:insightdb_pass@postgres:5432/insightdb_dev
       - REDIS_URL=redis://redis:6379/0
       - OPENAI_API_KEY=${OPENAI_API_KEY:-ollama}
       - OPENAI_BASE_URL=${OPENAI_BASE_URL:-http://host.docker.internal:11434/v1}
@@ -62,7 +62,7 @@ services:
     container_name: insightdb_frontend
     restart: always
     ports:
-      - "5173:5173"
+      - "5173:80"
     depends_on:
       - backend
 
