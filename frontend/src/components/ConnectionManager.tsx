@@ -82,11 +82,11 @@ export const ConnectionManager: React.FC<ConnectionManagerProps> = ({
     <div className="max-w-6xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center space-x-2">
-            <Server className="w-6 h-6 text-indigo-400" />
+          <h1 className="text-2xl font-bold flex items-center space-x-2" style={{ color: 'var(--text-primary)' }}>
+            <Server className="w-6 h-6 text-indigo-500 dark:text-indigo-400" />
             <span>Database Connections</span>
           </h1>
-          <p className="text-sm text-gray-400 mt-1">Manage target database connectors and encrypted access credentials</p>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>Manage target database connectors and encrypted access credentials</p>
         </div>
         <button
           onClick={() => setShowAdd(!showAdd)}
@@ -98,11 +98,11 @@ export const ConnectionManager: React.FC<ConnectionManagerProps> = ({
       </div>
 
       {showAdd && (
-        <div className="glass-panel p-6 rounded-2xl border border-gray-800 space-y-4">
-          <h3 className="text-lg font-semibold text-white">Configure New Connection</h3>
+        <div className="glass-panel p-6 rounded-2xl border space-y-4" style={{ borderColor: 'var(--border-base)' }}>
+          <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Configure New Connection</h3>
 
           {error && (
-            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm flex items-center space-x-2">
+            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 dark:text-rose-400 text-sm flex items-center space-x-2">
               <AlertCircle className="w-4 h-4" />
               <span>{error}</span>
             </div>
@@ -110,19 +110,20 @@ export const ConnectionManager: React.FC<ConnectionManagerProps> = ({
 
           <form onSubmit={handleSave} className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-gray-400 mb-1">Connection Name</label>
+              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Connection Name</label>
               <input
                 type="text"
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Production PostgreSQL"
-                className="w-full bg-gray-900 border border-gray-800 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                className="w-full border rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                style={{ background: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-400 mb-1">Database Engine</label>
+              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Database Engine</label>
               <select
                 value={dbType}
                 onChange={(e) => {
@@ -130,66 +131,72 @@ export const ConnectionManager: React.FC<ConnectionManagerProps> = ({
                   setDbType(type);
                   setPort(type === 'postgresql' ? 5432 : 3306);
                 }}
-                className="w-full bg-gray-900 border border-gray-800 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                className="w-full border rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                style={{ background: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
               >
-                <option value="postgresql">PostgreSQL</option>
-                <option value="mysql">MySQL</option>
+                <option value="postgresql" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)' }}>PostgreSQL</option>
+                <option value="mysql" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)' }}>MySQL</option>
               </select>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-400 mb-1">Host</label>
+              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Host</label>
               <input
                 type="text"
                 required
                 value={host}
                 onChange={(e) => setHost(e.target.value)}
-                className="w-full bg-gray-900 border border-gray-800 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                className="w-full border rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                style={{ background: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-400 mb-1">Port</label>
+              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Port</label>
               <input
                 type="number"
                 required
                 value={port}
                 onChange={(e) => setPort(Number(e.target.value))}
-                className="w-full bg-gray-900 border border-gray-800 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                className="w-full border rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                style={{ background: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-400 mb-1">Database Name</label>
+              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Database Name</label>
               <input
                 type="text"
                 required
                 value={databaseName}
                 onChange={(e) => setDatabaseName(e.target.value)}
                 placeholder="sales_db"
-                className="w-full bg-gray-900 border border-gray-800 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                className="w-full border rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                style={{ background: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-400 mb-1">Username</label>
+              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Username</label>
               <input
                 type="text"
                 required
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full bg-gray-900 border border-gray-800 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                className="w-full border rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                style={{ background: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
               />
             </div>
 
             <div className="md:col-span-2">
-              <label className="block text-xs font-medium text-gray-400 mb-1">Password</label>
+              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Password</label>
               <input
                 type="password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-gray-900 border border-gray-800 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                className="w-full border rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                style={{ background: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
               />
             </div>
 
@@ -197,8 +204,8 @@ export const ConnectionManager: React.FC<ConnectionManagerProps> = ({
               <div
                 className={`md:col-span-2 p-3 rounded-xl border text-sm flex items-center space-x-2 ${
                   testResult.success
-                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                    : 'bg-rose-500/10 border-rose-500/20 text-rose-400'
+                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                    : 'bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400'
                 }`}
               >
                 {testResult.success ? <CheckCircle className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
@@ -211,7 +218,8 @@ export const ConnectionManager: React.FC<ConnectionManagerProps> = ({
                 type="button"
                 onClick={handleTest}
                 disabled={testing}
-                className="bg-gray-800 hover:bg-gray-700 text-gray-200 text-sm font-medium px-4 py-2 rounded-xl transition-all flex items-center space-x-2"
+                className="text-sm font-medium px-4 py-2 rounded-xl transition-all flex items-center space-x-2 border"
+                style={{ background: 'var(--bg-tag)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
               >
                 {testing && <RefreshCw className="w-4 h-4 animate-spin" />}
                 <span>Test Connection</span>
@@ -241,33 +249,33 @@ export const ConnectionManager: React.FC<ConnectionManagerProps> = ({
               }`}
             >
               {isActive && (
-                <div className="absolute top-3 right-3 text-xs bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 px-2.5 py-0.5 rounded-full font-medium flex items-center space-x-1">
+                <div className="absolute top-3 right-3 text-xs bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 px-2.5 py-0.5 rounded-full font-medium flex items-center space-x-1">
                   <ShieldCheck className="w-3 h-3" />
                   <span>Active</span>
                 </div>
               )}
               <div className="flex items-center space-x-3 mb-3">
-                <div className="w-10 h-10 rounded-xl bg-gray-800 border border-gray-700 flex items-center justify-center text-indigo-400">
+                <div className="w-10 h-10 rounded-xl border flex items-center justify-center text-indigo-500 dark:text-indigo-400" style={{ background: 'var(--bg-tag)', borderColor: 'var(--border-base)' }}>
                   <Database className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="font-semibold text-white">{conn.name}</h4>
-                  <span className="text-xs text-indigo-400 font-medium uppercase tracking-wider">{conn.db_type}</span>
+                  <h4 className="font-semibold" style={{ color: 'var(--text-primary)' }}>{conn.name}</h4>
+                  <span className="text-xs text-indigo-500 dark:text-indigo-400 font-medium uppercase tracking-wider">{conn.db_type}</span>
                 </div>
               </div>
 
-              <div className="space-y-1.5 text-xs text-gray-400 font-mono">
+              <div className="space-y-1.5 text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>
                 <div className="flex justify-between">
                   <span>Host:</span>
-                  <span className="text-gray-200">{conn.host}:{conn.port}</span>
+                  <span style={{ color: 'var(--text-primary)' }}>{conn.host}:{conn.port}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Database:</span>
-                  <span className="text-gray-200">{conn.database_name}</span>
+                  <span style={{ color: 'var(--text-primary)' }}>{conn.database_name}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>User:</span>
-                  <span className="text-gray-200">{conn.username}</span>
+                  <span style={{ color: 'var(--text-primary)' }}>{conn.username}</span>
                 </div>
               </div>
             </div>
