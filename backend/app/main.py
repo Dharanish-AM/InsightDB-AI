@@ -4,15 +4,20 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1 import api_router
 from app.core.config import settings
 from app.core.logging import setup_logging
+from app.database.base import Base
+from app.database.session import engine
+import app.models.user
+import app.models.database_connection
+import app.models.schema_metadata
+import app.models.business_metadata
 
 logger = setup_logging()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Application lifecycle management hook.
-    """
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
     logger.info(f"Starting {settings.PROJECT_NAME} (v{settings.VERSION})...")
     yield
     logger.info(f"Shutting down {settings.PROJECT_NAME}...")
@@ -25,7 +30,6 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS Configuration
 if settings.CORS_ORIGINS:
     app.add_middleware(
         CORSMiddleware,
@@ -35,7 +39,6 @@ if settings.CORS_ORIGINS:
         allow_headers=["*"],
     )
 
-# Register API routes
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
 

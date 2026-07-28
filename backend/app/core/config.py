@@ -25,7 +25,7 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5173",
     ]
 
-    DATABASE_URL: str = "postgresql+asyncpg://insightdb:insightdb_pass@localhost:5432/insightdb_dev"
+    DATABASE_URL: str = "sqlite+aiosqlite:///./insightdb.db"
     REDIS_URL: str = "redis://localhost:6379/0"
 
     model_config = SettingsConfigDict(
