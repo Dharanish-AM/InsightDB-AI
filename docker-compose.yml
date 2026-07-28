@@ -46,6 +46,11 @@ services:
       - DEBUG=True
       - DATABASE_URL=postgresql://insightdb:insightdb_pass@postgres:5432/insightdb_dev
       - REDIS_URL=redis://redis:6379/0
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-ollama}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-http://host.docker.internal:11434/v1}
+      - LLM_MODEL_NAME=${LLM_MODEL_NAME:-llama3.1:8b}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       postgres:
         condition: service_healthy

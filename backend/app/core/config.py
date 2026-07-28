@@ -17,7 +17,7 @@ class Settings(BaseSettings):
 
     OPENAI_API_KEY: Optional[str] = None
     OPENAI_BASE_URL: str = "http://localhost:11434/v1"
-    LLM_MODEL_NAME: str = "llama3.1"
+    LLM_MODEL_NAME: str = "llama3.1:8b"
 
     CORS_ORIGINS: List[str] = [
         "http://localhost:5173",
