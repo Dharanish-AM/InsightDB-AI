@@ -90,11 +90,11 @@ def get_report_export_service() -> ReportExportService:
 
 
 async def get_pipeline_service(
-    db: AsyncSession = Depends(get_db),
-    history_repo: HistoryRepository = Depends(get_history_repository)
+    db: AsyncSession = Depends(get_db)
 ) -> PipelineService:
     connection_repo = ConnectionRepository(db)
     metadata_repo = MetadataRepository(db)
+    history_repo = HistoryRepository(db)
     metadata_service = MetadataService(db, metadata_repo, connection_repo)
     query_executor_service = QueryExecutorService(connection_repo)
     return PipelineService(connection_repo, metadata_service, query_executor_service, history_repo)
