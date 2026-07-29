@@ -1,8 +1,11 @@
+import json
+from typing import Optional
 from fastapi import HTTPException, status
 from app.agents.insight_agent import insight_agent
 from app.agents.planner_agent import planner_agent
 from app.agents.sql_agent import sql_agent
 from app.repositories.connection_repository import ConnectionRepository
+from app.repositories.history_repository import HistoryRepository
 from app.schemas.pipeline import PipelineAskRequest, PipelineAskResponse
 from app.schemas.query_executor import QueryExecuteRequest
 from app.services.metadata_service import MetadataService
@@ -14,11 +17,13 @@ class PipelineService:
         self,
         connection_repo: ConnectionRepository,
         metadata_service: MetadataService,
-        query_executor_service: QueryExecutorService
+        query_executor_service: QueryExecutorService,
+        history_repo: Optional[HistoryRepository] = None
     ):
         self.connection_repo = connection_repo
         self.metadata_service = metadata_service
         self.query_executor_service = query_executor_service
+        self.history_repo = history_repo
 
     async def run_pipeline(
         self,
@@ -39,18 +44,25 @@ class PipelineService:
 
         context_res = await self.metadata_service.build_prompt_context(conn.id, owner_id)
         schema_context = context_res.prompt_context
-        # A planner cannot safely select a table until the connection has been
-        # inspected.  In particular, never allow the planner's placeholder
-        # (``default_table``) to progress to query execution.
+
         if not planner_agent._schema_columns(schema_context):
+            err_msg = (
+                "Schema metadata is not available for this connection. "
+                "Sync the schema in Data catalog, then ask your question again."
+            )
+            if self.history_repo:
+                await self.history_repo.create(
+                    user_id=owner_id,
+                    connection_id=conn.id,
+                    user_query=request.user_query,
+                    status="failed",
+                    error=err_msg
+                )
             return PipelineAskResponse(
                 success=False,
                 connection_id=conn.id,
                 user_query=request.user_query,
-                error=(
-                    "Schema metadata is not available for this connection. "
-                    "Sync the schema in Data catalog, then ask your question again."
-                )
+                error=err_msg
             )
         dialect_str = conn.db_type.value if hasattr(conn.db_type, "value") else str(conn.db_type)
 
@@ -60,11 +72,20 @@ class PipelineService:
                 schema_context=schema_context
             )
         except Exception as err:
+            err_msg = f"Planner Agent failure: {str(err)}"
+            if self.history_repo:
+                await self.history_repo.create(
+                    user_id=owner_id,
+                    connection_id=conn.id,
+                    user_query=request.user_query,
+                    status="failed",
+                    error=err_msg
+                )
             return PipelineAskResponse(
                 success=False,
                 connection_id=conn.id,
                 user_query=request.user_query,
-                error=f"Planner Agent failure: {str(err)}"
+                error=err_msg
             )
 
         try:
@@ -75,12 +96,21 @@ class PipelineService:
             )
             raw_sql = sql_res.sql
         except Exception as err:
+            err_msg = f"SQL Generator failure: {str(err)}"
+            if self.history_repo:
+                await self.history_repo.create(
+                    user_id=owner_id,
+                    connection_id=conn.id,
+                    user_query=request.user_query,
+                    status="failed",
+                    error=err_msg
+                )
             return PipelineAskResponse(
                 success=False,
                 connection_id=conn.id,
                 user_query=request.user_query,
                 plan=plan,
-                error=f"SQL Generator failure: {str(err)}"
+                error=err_msg
             )
 
         exec_req = QueryExecuteRequest(
@@ -92,6 +122,17 @@ class PipelineService:
         query_res = await self.query_executor_service.execute_query(exec_req, owner_id)
 
         if not query_res.success:
+            err_msg = f"Query Execution / Validation failed: {query_res.error}"
+            if self.history_repo:
+                await self.history_repo.create(
+                    user_id=owner_id,
+                    connection_id=conn.id,
+                    user_query=request.user_query,
+                    generated_sql=raw_sql,
+                    sanitized_sql=query_res.sanitized_sql,
+                    status="failed",
+                    error=err_msg
+                )
             return PipelineAskResponse(
                 success=False,
                 connection_id=conn.id,
@@ -100,7 +141,7 @@ class PipelineService:
                 sql_generated=raw_sql,
                 sanitized_sql=query_res.sanitized_sql,
                 query_results=query_res,
-                error=f"Query Execution / Validation failed: {query_res.error}"
+                error=err_msg
             )
 
         col_names = [c.name for c in query_res.columns]
@@ -110,6 +151,19 @@ class PipelineService:
             columns=col_names,
             rows=query_res.rows
         )
+
+        if self.history_repo:
+            await self.history_repo.create(
+                user_id=owner_id,
+                connection_id=conn.id,
+                user_query=request.user_query,
+                generated_sql=raw_sql,
+                sanitized_sql=query_res.sanitized_sql,
+                status="success",
+                row_count=query_res.row_count,
+                execution_time_ms=query_res.execution_time_ms,
+                insights_json=json.dumps(insights.model_dump(), default=str)
+            )
 
         return PipelineAskResponse(
             success=True,

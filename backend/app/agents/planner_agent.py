@@ -2,7 +2,7 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Dict, Optional, Set
+from typing import Dict, List, Optional, Set
 from app.core.config import settings
 from app.schemas.planner import (
     FilterConditionSpec,
@@ -22,49 +22,6 @@ class PlannerAgent:
         with open(prompt_path, "r", encoding="utf-8") as f:
             self.prompt_template = f.read()
 
-    def _fallback_plan(self, user_query: str, schema_context: str) -> QueryExecutionPlan:
-        q_lower = user_query.lower()
-        target_tables = []
-
-        for line in schema_context.split("\n"):
-            if line.startswith("## Table:"):
-                t_name = line.split("## Table:")[1].split("(")[0].strip()
-                if t_name.lower() in q_lower or not target_tables:
-                    target_tables.append(t_name)
-
-        if not target_tables:
-            target_tables = ["default_table"]
-
-        # Listing requests should return rows, rather than an arbitrary count.  This
-        # is also the safe fallback when an LLM plan mentions schema fields that do
-        # not exist in the synced connection metadata.
-        is_listing_request = any(
-            phrase in q_lower
-            for phrase in ("show", "list", "display", "get all", "retrieve all")
-        )
-        is_aggregate_request = any(
-            phrase in q_lower
-            for phrase in ("how many", "count", "total", "average", "sum")
-        )
-
-        return QueryExecutionPlan(
-            intent_summary=f"Query intent derived for: {user_query}",
-            target_tables=target_tables[:2],
-            join_paths=[],
-            metrics=[] if is_listing_request and not is_aggregate_request else [
-                MetricAggregationSpec(
-                    expression="COUNT(*)",
-                    alias="total_records",
-                    aggregation_function="COUNT"
-                )
-            ],
-            dimensions=[],
-            filters=[],
-            group_by=[],
-            sort_by=[],
-            limit=1000
-        )
-
     @staticmethod
     def _schema_columns(schema_context: str) -> Dict[str, Set[str]]:
         """Parse the compact prompt context into table-to-column lookup data."""
@@ -81,6 +38,135 @@ class PlannerAgent:
                 tables[current_table].add(column_match.group(1))
         return tables
 
+    def _fallback_plan(self, user_query: str, schema_context: str) -> QueryExecutionPlan:
+        q_lower = user_query.lower()
+        tables_map = self._schema_columns(schema_context)
+        all_tables = list(tables_map.keys())
+
+        if not all_tables:
+            return QueryExecutionPlan(
+                intent_summary=f"Query intent derived for: {user_query}",
+                target_tables=["default_table"],
+                join_paths=[],
+                metrics=[MetricAggregationSpec(expression="COUNT(*)", alias="total_records", aggregation_function="COUNT")],
+                dimensions=[],
+                filters=[],
+                group_by=[],
+                sort_by=[],
+                limit=1000
+            )
+
+        # 1. Identify primary entity and intent keywords
+        has_revenue_intent = any(word in q_lower for word in ("revenue", "amount", "sales", "earnings", "income", "total paid", "spent"))
+        has_count_intent = any(word in q_lower for word in ("count", "how many", "number of", "total drivers", "total vehicles", "total spots", "total reservations"))
+        has_location_intent = any(word in q_lower for word in ("location", "garage", "lot", "deck", "hub", "facility"))
+
+        # Find best matching primary table
+        primary_table = None
+        for t_name in all_tables:
+            t_normalized = t_name.lower().replace("_", " ").rstrip("s")
+            words = t_normalized.split()
+            if any(w in q_lower for w in words):
+                primary_table = t_name
+                break
+
+        if not primary_table:
+            if has_location_intent and "parking_locations" in tables_map:
+                primary_table = "parking_locations"
+            elif has_revenue_intent and "parking_reservations" in tables_map:
+                primary_table = "parking_reservations"
+            else:
+                primary_table = all_tables[0]
+
+        # 2. Build intelligent dimensions, metrics, joins, and grouping
+        dimensions: List[str] = []
+        metrics: List[MetricAggregationSpec] = []
+        join_paths: List[JoinPathSpec] = []
+        group_by: List[str] = []
+        sort_by: List[SortCriterionSpec] = []
+
+        # Revenue query handling
+        if has_revenue_intent:
+            fact_table = None
+            amount_col = None
+
+            for candidate in ("parking_reservations", "payments"):
+                if candidate in tables_map:
+                    for col in ("total_amount", "amount", "hourly_rate"):
+                        if col in tables_map[candidate]:
+                            fact_table = candidate
+                            amount_col = col
+                            break
+                if fact_table:
+                    break
+
+            if not fact_table:
+                # Find any numeric column across tables
+                for t, cols in tables_map.items():
+                    for col in cols:
+                        if any(term in col for term in ("amount", "rate", "price", "revenue", "cost")):
+                            fact_table = t
+                            amount_col = col
+                            break
+
+            if fact_table and amount_col:
+                metrics.append(
+                    MetricAggregationSpec(
+                        expression=f"SUM({fact_table}.{amount_col})",
+                        alias="total_revenue",
+                        aggregation_function="SUM"
+                    )
+                )
+                sort_by.append(SortCriterionSpec(column="total_revenue", direction="DESC"))
+
+                # Location breakdown handling
+                if has_location_intent and "parking_locations" in tables_map:
+                    primary_table = "parking_locations"
+                    loc_name_col = "name" if "name" in tables_map["parking_locations"] else list(tables_map["parking_locations"])[0]
+                    dim_ref = f"parking_locations.{loc_name_col}"
+                    dimensions.append(dim_ref)
+                    group_by.append(dim_ref)
+
+                    if fact_table != "parking_locations" and "location_id" in tables_map[fact_table]:
+                        join_paths.append(
+                            JoinPathSpec(
+                                source_table="parking_locations",
+                                target_table=fact_table,
+                                join_type="INNER",
+                                on_condition=f"parking_locations.id = {fact_table}.location_id"
+                            )
+                        )
+
+        # Count or Breakdown handling if no metric assigned yet
+        if not metrics:
+            if "name" in tables_map.get(primary_table, set()):
+                dimensions.append(f"{primary_table}.name")
+                group_by.append(f"{primary_table}.name")
+            elif "spot_type" in tables_map.get(primary_table, set()):
+                dimensions.append(f"{primary_table}.spot_type")
+                group_by.append(f"{primary_table}.spot_type")
+
+            metrics.append(
+                MetricAggregationSpec(
+                    expression="COUNT(*)",
+                    alias="total_records",
+                    aggregation_function="COUNT"
+                )
+            )
+            sort_by.append(SortCriterionSpec(column="total_records", direction="DESC"))
+
+        return QueryExecutionPlan(
+            intent_summary=f"Execution plan derived for: {user_query}",
+            target_tables=[primary_table],
+            join_paths=join_paths,
+            metrics=metrics,
+            dimensions=dimensions,
+            filters=[],
+            group_by=group_by,
+            sort_by=sort_by,
+            limit=1000
+        )
+
     @classmethod
     def _plan_matches_schema(cls, plan: QueryExecutionPlan, schema_context: str) -> bool:
         """Reject LLM plans that reference tables or fields absent from metadata."""
@@ -94,8 +180,6 @@ class PlannerAgent:
             return False
 
         def has_column(reference: str) -> bool:
-            # Aliases (for example, a COUNT alias in ORDER BY) are not schema
-            # columns and are intentionally handled by the caller.
             parts = reference.split(".")
             if len(parts) == 2:
                 return parts[0] in tables and parts[1] in tables[parts[0]]

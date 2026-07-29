@@ -122,3 +122,48 @@ export interface PipelineAskResponse {
   insights?: InsightGenerateResponse;
   error?: string;
 }
+
+export interface QueryHistoryItem {
+  id: number;
+  user_id: number;
+  connection_id: number;
+  user_query: string;
+  generated_sql?: string;
+  sanitized_sql?: string;
+  status: 'success' | 'failed';
+  row_count: number;
+  execution_time_ms: number;
+  error?: string;
+  insights_json?: string;
+  created_at: string;
+}
+
+export interface HistoryListResponse {
+  total: number;
+  items: QueryHistoryItem[];
+}
+
+export interface HistoryStats {
+  total_queries: number;
+  successful_queries: number;
+  failed_queries: number;
+  success_rate_percentage: number;
+  average_execution_time_ms: number;
+  total_rows_fetched: number;
+}
+
+export interface ReportExportRequest {
+  format: 'csv' | 'json' | 'markdown';
+  filename?: string;
+  columns: string[];
+  rows: Record<string, any>[];
+  user_query?: string;
+  summary?: string;
+}
+
+export interface ReportExportResponse {
+  filename: string;
+  format: string;
+  content_type: string;
+  content: string;
+}

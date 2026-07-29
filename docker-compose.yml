@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-insightdb_pass}
       POSTGRES_DB: ${POSTGRES_DB:-insightdb_dev}
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -22,7 +22,7 @@ services:
     container_name: insightdb_redis
     restart: always
     ports:
-      - "6379:6379"
+      - "6380:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -30,6 +30,15 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: insightdb_ollama
+    restart: always
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
 
   backend:
     build:
@@ -45,8 +54,8 @@ services:
       - DATABASE_URL=postgresql+asyncpg://insightdb:insightdb_pass@postgres:5432/insightdb_dev
       - REDIS_URL=redis://redis:6379/0
       - OPENAI_API_KEY=${OPENAI_API_KEY:-ollama}
-      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-http://host.docker.internal:11434/v1}
-      - LLM_MODEL_NAME=${LLM_MODEL_NAME:-llama3.1:8b}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-http://ollama:11434/v1}
+      - LLM_MODEL_NAME=${LLM_MODEL_NAME:-llama3.2:1b}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -54,6 +63,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      ollama:
+        condition: service_started
 
   frontend:
     build:
@@ -69,3 +80,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  ollama_data:

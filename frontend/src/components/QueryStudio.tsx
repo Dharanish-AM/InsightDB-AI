@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
-import { Sparkles, ShieldCheck, ShieldAlert, Code2, Table, TrendingUp, AlertTriangle, Lightbulb, CheckCircle2, Clock, Database, ArrowUpRight, MoveHorizontal } from 'lucide-react';
+import { Sparkles, ShieldCheck, ShieldAlert, Code2, Table, TrendingUp, AlertTriangle, Lightbulb, CheckCircle2, Clock, Database, ArrowUpRight, MoveHorizontal, Download } from 'lucide-react';
 import { api } from '../services/api';
 import { DatabaseConnection, PipelineAskResponse } from '../types';
 
 interface QueryStudioProps {
   connection: DatabaseConnection | null;
+  initialQuery?: string;
 }
 
-export const QueryStudio: React.FC<QueryStudioProps> = ({ connection }) => {
-  const [prompt, setPrompt] = useState('');
+export const QueryStudio: React.FC<QueryStudioProps> = ({ connection, initialQuery }) => {
+  const [prompt, setPrompt] = useState(initialQuery || '');
   const [loading, setLoading] = useState(false);
+  const [exportingFormat, setExportingFormat] = useState<string | null>(null);
   const [response, setResponse] = useState<PipelineAskResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -19,9 +21,6 @@ export const QueryStudio: React.FC<QueryStudioProps> = ({ connection }) => {
     setLoading(true);
     setError(null);
     try {
-      // The pipeline only queries tables that have been inspected.  Sync a new
-      // connection automatically so the first question cannot fall back to a
-      // placeholder table name.
       const schema = await api.getSchema(connection.id);
       if (schema.length === 0) {
         await api.syncSchema(connection.id);
@@ -35,6 +34,36 @@ export const QueryStudio: React.FC<QueryStudioProps> = ({ connection }) => {
       setError(err.message || 'Pipeline execution failed');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleExport = async (format: 'csv' | 'markdown' | 'json') => {
+    if (!response || !response.query_results) return;
+    setExportingFormat(format);
+    try {
+      const cols = response.query_results.columns.map(c => c.name);
+      const reportRes = await api.exportReport({
+        format,
+        filename: `insightdb_${connection?.name || 'export'}`,
+        columns: cols,
+        rows: response.query_results.rows,
+        user_query: response.user_query,
+        summary: response.insights?.summary
+      });
+
+      const blob = new Blob([reportRes.content], { type: reportRes.content_type });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = reportRes.filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      alert('Export failed: ' + (err.message || 'Unknown error'));
+    } finally {
+      setExportingFormat(null);
     }
   };
 
@@ -136,16 +165,46 @@ export const QueryStudio: React.FC<QueryStudioProps> = ({ connection }) => {
 
           {response.query_results && response.query_results.success && (
             <div className="glass-panel p-5 rounded-2xl border space-y-4" style={{ borderColor: 'var(--border-base)' }}>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <span className="text-xs font-semibold uppercase tracking-wider flex items-center space-x-1.5" style={{ color: 'var(--text-secondary)' }}>
                   <Table className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
                   <span>Query Results ({response.query_results.row_count} returned rows)</span>
                 </span>
-                <div className="flex items-center space-x-3 text-xs" style={{ color: 'var(--text-secondary)' }}>
-                  <span className="flex items-center space-x-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="flex items-center space-x-1 text-xs mr-2" style={{ color: 'var(--text-secondary)' }}>
                     <Clock className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
                     <span>{response.query_results.execution_time_ms} ms</span>
                   </span>
+
+                  <div className="flex items-center gap-1 rounded-xl p-1 text-xs border" style={{ background: 'var(--bg-tag)', borderColor: 'var(--border-base)' }}>
+                    <span className="text-[11px] px-2 font-medium flex items-center gap-1" style={{ color: 'var(--text-secondary)' }}>
+                      <Download className="w-3.5 h-3.5 text-indigo-500" /> Export:
+                    </span>
+                    <button
+                      onClick={() => handleExport('csv')}
+                      disabled={exportingFormat !== null}
+                      className="px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-colors hover:bg-black/5 dark:hover:bg-white/10"
+                      style={{ background: 'var(--bg-card)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
+                    >
+                      CSV
+                    </button>
+                    <button
+                      onClick={() => handleExport('markdown')}
+                      disabled={exportingFormat !== null}
+                      className="px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-colors hover:bg-black/5 dark:hover:bg-white/10"
+                      style={{ background: 'var(--bg-card)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
+                    >
+                      Markdown
+                    </button>
+                    <button
+                      onClick={() => handleExport('json')}
+                      disabled={exportingFormat !== null}
+                      className="px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-colors hover:bg-black/5 dark:hover:bg-white/10"
+                      style={{ background: 'var(--bg-card)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
+                    >
+                      JSON
+                    </button>
+                  </div>
                 </div>
               </div>
 

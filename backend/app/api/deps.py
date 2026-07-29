@@ -7,7 +7,16 @@ from app.core.config import settings
 from app.core.security import decode_token
 from app.database.session import get_db
 from app.models.user import User, UserRole
+from app.repositories.connection_repository import ConnectionRepository
+from app.repositories.history_repository import HistoryRepository
+from app.repositories.metadata_repository import MetadataRepository
 from app.repositories.user_repository import UserRepository
+from app.services.connection_manager import connection_manager
+from app.services.history_service import HistoryService
+from app.services.metadata_service import MetadataService
+from app.services.pipeline_service import PipelineService
+from app.services.query_executor_service import QueryExecutorService
+from app.services.report_export_service import ReportExportService
 
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl=f"{settings.API_V1_STR}/auth/login"
@@ -64,3 +73,28 @@ def require_roles(allowed_roles: List[UserRole]) -> Callable:
             )
         return current_user
     return role_checker
+
+
+async def get_history_repository(db: AsyncSession = Depends(get_db)) -> HistoryRepository:
+    return HistoryRepository(db)
+
+
+async def get_history_service(
+    history_repo: HistoryRepository = Depends(get_history_repository)
+) -> HistoryService:
+    return HistoryService(history_repo)
+
+
+def get_report_export_service() -> ReportExportService:
+    return ReportExportService()
+
+
+async def get_pipeline_service(
+    db: AsyncSession = Depends(get_db),
+    history_repo: HistoryRepository = Depends(get_history_repository)
+) -> PipelineService:
+    connection_repo = ConnectionRepository(db)
+    metadata_repo = MetadataRepository(db)
+    metadata_service = MetadataService(db, metadata_repo, connection_repo)
+    query_executor_service = QueryExecutorService(connection_repo)
+    return PipelineService(connection_repo, metadata_service, query_executor_service, history_repo)

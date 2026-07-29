@@ -1,9 +1,14 @@
 import {
   AuthResponse,
   DatabaseConnection,
+  HistoryListResponse,
+  HistoryStats,
   InsightGenerateResponse,
   PipelineAskResponse,
   QueryExecuteResponse,
+  QueryHistoryItem,
+  ReportExportRequest,
+  ReportExportResponse,
   SchemaTable,
   SqlValidateResponse,
   User
@@ -187,6 +192,53 @@ export const api = {
       const err = await res.json();
       throw new Error(err.detail || 'Pipeline request failed');
     }
+    return res.json();
+  },
+
+  async getHistory(connectionId?: number, skip = 0, limit = 50): Promise<HistoryListResponse> {
+    const url = new URL(`${window.location.origin}${API_BASE}/history`);
+    if (connectionId) url.searchParams.append('connection_id', connectionId.toString());
+    url.searchParams.append('skip', skip.toString());
+    url.searchParams.append('limit', limit.toString());
+
+    const res = await fetch(url.toString().replace(window.location.origin, ''), {
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error('Failed to fetch history');
+    return res.json();
+  },
+
+  async getHistoryStats(): Promise<HistoryStats> {
+    const res = await fetch(`${API_BASE}/history/stats`, {
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error('Failed to fetch history stats');
+    return res.json();
+  },
+
+  async getHistoryDetail(historyId: number): Promise<QueryHistoryItem> {
+    const res = await fetch(`${API_BASE}/history/${historyId}`, {
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error('Failed to fetch history detail');
+    return res.json();
+  },
+
+  async deleteHistoryItem(historyId: number): Promise<void> {
+    const res = await fetch(`${API_BASE}/history/${historyId}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error('Failed to delete history item');
+  },
+
+  async exportReport(request: ReportExportRequest): Promise<ReportExportResponse> {
+    const res = await fetch(`${API_BASE}/reports/export`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(request),
+    });
+    if (!res.ok) throw new Error('Report export failed');
     return res.json();
   }
 };

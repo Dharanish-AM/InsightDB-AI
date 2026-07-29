@@ -10,6 +10,7 @@ import app.models.user
 import app.models.database_connection
 import app.models.schema_metadata
 import app.models.business_metadata
+import app.models.query_history
 
 logger = setup_logging()
 
