@@ -85,6 +85,23 @@ class PlannerAgent:
         group_by: List[str] = []
         sort_by: List[SortCriterionSpec] = []
 
+        # Determine sorting direction
+        is_asc = any(w in q_lower for w in ("lowest", "least", "minimum", "min", "bottom", "worst", "cheapest", "smallest", "fewest"))
+        sort_dir = "ASC" if is_asc else "DESC"
+
+        # Determine row limit
+        limit_val = 1000
+        if any(w in q_lower for w in ("lowest", "least", "minimum", "min", "bottom", "highest", "most", "maximum", "max", "top", "best")):
+            is_singular = True
+            if any(w in q_lower for w in ("locations", "garages", "lots", "reservations", "drivers", "payments", "vehicles", "users", "orders")):
+                is_singular = False
+            
+            num_match = re.search(r"\b(top|bottom|limit|show|get)\s+(\d+)\b", q_lower)
+            if num_match:
+                limit_val = int(num_match.group(2))
+            elif is_singular:
+                limit_val = 1
+
         # Revenue query handling
         if has_revenue_intent:
             fact_table = None
@@ -117,7 +134,7 @@ class PlannerAgent:
                         aggregation_function="SUM"
                     )
                 )
-                sort_by.append(SortCriterionSpec(column="total_revenue", direction="DESC"))
+                sort_by.append(SortCriterionSpec(column="total_revenue", direction=sort_dir))
 
                 # Location breakdown handling
                 if has_location_intent and "parking_locations" in tables_map:
@@ -154,7 +171,7 @@ class PlannerAgent:
                     aggregation_function="COUNT"
                 )
             )
-            sort_by.append(SortCriterionSpec(column="total_records", direction="DESC"))
+            sort_by.append(SortCriterionSpec(column="total_records", direction=sort_dir))
 
         return QueryExecutionPlan(
             intent_summary=f"Execution plan derived for: {user_query}",
@@ -165,7 +182,7 @@ class PlannerAgent:
             filters=[],
             group_by=group_by,
             sort_by=sort_by,
-            limit=1000
+            limit=limit_val
         )
 
     @classmethod
@@ -212,7 +229,7 @@ class PlannerAgent:
 
         try:
             import openai
-            timeout_sec = float(os.getenv("LLM_TIMEOUT", "3.0"))
+            timeout_sec = float(os.getenv("LLM_TIMEOUT", "30.0"))
             client = openai.AsyncOpenAI(api_key=api_key, base_url=base_url, timeout=timeout_sec)
             formatted_prompt = self.prompt_template.format(
                 schema_context=schema_context,

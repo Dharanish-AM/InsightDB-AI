@@ -104,7 +104,7 @@ class SqlAgent:
 
         try:
             import openai
-            timeout_sec = float(os.getenv("LLM_TIMEOUT", "3.0"))
+            timeout_sec = float(os.getenv("LLM_TIMEOUT", "30.0"))
             client = openai.AsyncOpenAI(api_key=api_key, base_url=base_url, timeout=timeout_sec)
             formatted_prompt = self.prompt_template.format(
                 dialect=dialect,

@@ -51,6 +51,35 @@ Columns:
     assert fallback.limit == 1000
 
 
+def test_planner_fallback_sorting_and_limits():
+    schema_context = """# Database Schema Context
+
+## Table: parking_locations
+Columns:
+  - id: INTEGER [PRIMARY KEY]
+  - name: VARCHAR
+## Table: parking_reservations
+Columns:
+  - id: INTEGER [PRIMARY KEY]
+  - location_id: INTEGER [FOREIGN KEY -> parking_locations.id]
+  - total_amount: DECIMAL(10,2) [SEMANTIC: METRIC]
+"""
+    plan1 = planner_agent._fallback_plan("Show lowest revenue location", schema_context)
+    assert plan1.limit == 1
+    assert len(plan1.sort_by) == 1
+    assert plan1.sort_by[0].column == "total_revenue"
+    assert plan1.sort_by[0].direction == "ASC"
+
+    plan2 = planner_agent._fallback_plan("top 5 locations by revenue", schema_context)
+    assert plan2.limit == 5
+    assert len(plan2.sort_by) == 1
+    assert plan2.sort_by[0].column == "total_revenue"
+    assert plan2.sort_by[0].direction == "DESC"
+
+    plan3 = planner_agent._fallback_plan("show all locations", schema_context)
+    assert plan3.limit == 1000
+
+
 @pytest.mark.asyncio
 async def test_planner_api_endpoint(async_client: AsyncClient, db_session):
     await async_client.post(
