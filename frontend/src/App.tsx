@@ -20,7 +20,7 @@ export function App() {
     try {
       const data = await api.getConnections();
       setConnections(data);
-      setActiveConnection(current => current ?? data[0] ?? null);
+      setActiveConnection(current => current ?? data.find(c => c.name.includes('Metropolis') || c.database_name !== 'insightdb_dev') ?? data[0] ?? null);
     } catch (err) {
       console.error(err);
     }
@@ -81,30 +81,29 @@ export function App() {
         onLogout={handleLogout}
       />
       <main className="app-main">
-        {activeTab === 'studio' && (
+        <div style={{ display: activeTab === 'studio' ? 'block' : 'none' }}>
           <QueryStudio
-            key={selectedHistoryQuery || 'default'}
             connection={activeConnection}
             initialQuery={selectedHistoryQuery}
           />
-        )}
-        {activeTab === 'history' && (
+        </div>
+        <div style={{ display: activeTab === 'history' ? 'block' : 'none' }}>
           <QueryHistoryView
             connections={connections}
             onSelectQuery={handleSelectHistoryQuery}
           />
-        )}
-        {activeTab === 'connections' && (
+        </div>
+        <div style={{ display: activeTab === 'connections' ? 'block' : 'none' }}>
           <ConnectionManager
             connections={connections}
             activeConnection={activeConnection}
             onSelectConnection={setActiveConnection}
             onRefreshConnections={fetchConnections}
           />
-        )}
-        {activeTab === 'schema' && (
+        </div>
+        <div style={{ display: activeTab === 'schema' ? 'block' : 'none' }}>
           <SchemaExplorer connection={activeConnection} />
-        )}
+        </div>
       </main>
       <footer className="mt-auto border-t px-6 py-5 text-center text-xs" style={{ borderColor: 'var(--border-base)', color: 'var(--text-muted)' }}>
         InsightDB AI <span className="mx-2">·</span> Intelligence for every SQL decision

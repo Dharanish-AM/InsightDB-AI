@@ -49,17 +49,17 @@ export const Navbar: React.FC<NavbarProps> = ({ user, activeTab, setActiveTab, c
           ))}
         </nav>
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          <div className="hidden lg:flex items-center gap-2 rounded-xl border px-3 py-2 max-w-[250px]" style={{ background: 'var(--bg-input)', borderColor: 'var(--border-base)' }}>
+          <div className="hidden lg:flex items-center gap-2 rounded-xl border px-3 py-2 max-w-[360px] min-w-[220px]" style={{ background: 'var(--bg-input)', borderColor: 'var(--border-base)' }}>
             <Database className="w-4 h-4 text-violet-400 shrink-0" />
             <select
               aria-label="Active database connection"
               value={activeConnection?.id || ''}
               onChange={e => setActiveConnection(connections.find(c => c.id === Number(e.target.value)) ?? null)}
-              className="appearance-none bg-transparent min-w-0 flex-1 text-xs font-semibold outline-none cursor-pointer"
+              className="appearance-none bg-transparent min-w-0 flex-1 text-xs font-semibold outline-none cursor-pointer truncate"
               style={{ color: 'var(--text-primary)' }}
             >
               <option value="" disabled>Select database</option>
-              {connections.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              {connections.map(c => <option key={c.id} value={c.id} title={c.name}>{c.name}</option>)}
             </select>
             <ChevronDown className="w-3 h-3" style={{ color: 'var(--text-muted)' }} />
           </div>

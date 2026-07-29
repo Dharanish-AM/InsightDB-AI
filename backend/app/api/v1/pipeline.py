@@ -4,6 +4,7 @@ from app.api.deps import get_current_active_user
 from app.database.session import get_db
 from app.models.user import User
 from app.repositories.connection_repository import ConnectionRepository
+from app.repositories.history_repository import HistoryRepository
 from app.repositories.metadata_repository import MetadataRepository
 from app.schemas.pipeline import PipelineAskRequest, PipelineAskResponse
 from app.services.metadata_service import MetadataService
@@ -16,9 +17,10 @@ router = APIRouter()
 def get_pipeline_service(db: AsyncSession = Depends(get_db)) -> PipelineService:
     conn_repo = ConnectionRepository(db)
     meta_repo = MetadataRepository(db)
+    history_repo = HistoryRepository(db)
     meta_service = MetadataService(db, meta_repo, conn_repo)
     exec_service = QueryExecutorService(conn_repo)
-    return PipelineService(conn_repo, meta_service, exec_service)
+    return PipelineService(conn_repo, meta_service, exec_service, history_repo=history_repo)
 
 
 @router.post("/ask", response_model=PipelineAskResponse)

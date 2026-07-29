@@ -15,6 +15,12 @@ export const QueryStudio: React.FC<QueryStudioProps> = ({ connection, initialQue
   const [response, setResponse] = useState<PipelineAskResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  React.useEffect(() => {
+    if (initialQuery) {
+      setPrompt(initialQuery);
+    }
+  }, [initialQuery]);
+
   const handleAsk = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!connection || !prompt.trim()) return;

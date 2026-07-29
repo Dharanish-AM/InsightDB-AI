@@ -224,11 +224,11 @@ export const QueryHistoryView: React.FC<QueryHistoryProps> = ({ connections, onS
 
       {/* Inspect Modal */}
       {selectedItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-          <div className="glass-panel rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl max-h-[85vh] flex flex-col border" style={{ borderColor: 'var(--border-strong)' }}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/75 backdrop-blur-md overflow-y-auto">
+          <div className="glass-panel rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl max-h-[85vh] flex flex-col border my-auto" style={{ borderColor: 'var(--border-strong)' }}>
             <div className="p-5 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-base)', background: 'var(--bg-table-head)' }}>
               <h3 className="font-bold text-base flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-                <ExternalLink className="w-4 h-4 text-indigo-500" />
+                <ExternalLink className="w-4 h-4 text-violet-400" />
                 Query Log Inspection
               </h3>
               <button
@@ -251,7 +251,7 @@ export const QueryHistoryView: React.FC<QueryHistoryProps> = ({ connections, onS
               {selectedItem.sanitized_sql && (
                 <div>
                   <label className="field-label">Sanitized Dialect SQL Query</label>
-                  <pre className="code-font text-xs p-4 rounded-xl border overflow-x-auto whitespace-pre-wrap" style={{ background: 'var(--bg-code)', borderColor: 'var(--border-base)', color: 'var(--text-code)' }}>
+                  <pre className="code-font text-xs p-4 rounded-xl border overflow-x-auto whitespace-pre-wrap leading-relaxed" style={{ background: 'var(--bg-code)', borderColor: 'var(--border-base)', color: 'var(--text-code)' }}>
                     {selectedItem.sanitized_sql}
                   </pre>
                 </div>
@@ -278,7 +278,20 @@ export const QueryHistoryView: React.FC<QueryHistoryProps> = ({ connections, onS
               </div>
             </div>
 
-            <div className="p-4 border-t flex justify-end gap-2" style={{ borderColor: 'var(--border-base)', background: 'var(--bg-table-head)' }}>
+            <div className="p-4 border-t flex items-center justify-between gap-2" style={{ borderColor: 'var(--border-base)', background: 'var(--bg-table-head)' }}>
+              {onSelectQuery && selectedItem.sanitized_sql ? (
+                <button
+                  onClick={() => {
+                    const item = selectedItem;
+                    setSelectedItem(null);
+                    onSelectQuery(item.sanitized_sql!, item.user_query);
+                  }}
+                  className="btn-primary px-4 py-2 text-xs"
+                >
+                  <Code2 className="w-4 h-4" />
+                  <span>Use in Studio</span>
+                </button>
+              ) : <div />}
               <button
                 onClick={() => setSelectedItem(null)}
                 className="btn-secondary px-5 py-2 text-xs font-semibold"
