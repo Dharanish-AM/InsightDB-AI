@@ -88,9 +88,13 @@ class InsightAgent:
         base_url = os.getenv("OPENAI_BASE_URL", settings.OPENAI_BASE_URL)
         model_name = os.getenv("LLM_MODEL_NAME", settings.LLM_MODEL_NAME)
 
+        if not api_key or os.getenv("SKIP_LLM_TESTS", "false").lower() == "true":
+            return self._fallback_insights(user_query, columns, rows)
+
         try:
             import openai
-            client = openai.AsyncOpenAI(api_key=api_key, base_url=base_url)
+            timeout_sec = float(os.getenv("LLM_TIMEOUT", "3.0"))
+            client = openai.AsyncOpenAI(api_key=api_key, base_url=base_url, timeout=timeout_sec)
             rows_sample = json.dumps(rows[:100], indent=2, default=str)
             formatted_prompt = self.prompt_template.format(
                 user_query=user_query or "N/A",

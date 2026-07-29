@@ -97,14 +97,15 @@ class SqlAgent:
         base_url = os.getenv("OPENAI_BASE_URL", settings.OPENAI_BASE_URL)
         model_name = os.getenv("LLM_MODEL_NAME", settings.LLM_MODEL_NAME)
 
-        if not api_key:
+        if not api_key or os.getenv("SKIP_LLM_TESTS", "false").lower() == "true":
             res = self._build_deterministic_sql(plan, dialect)
             res.connection_id = connection_id
             return res
 
         try:
             import openai
-            client = openai.AsyncOpenAI(api_key=api_key, base_url=base_url)
+            timeout_sec = float(os.getenv("LLM_TIMEOUT", "3.0"))
+            client = openai.AsyncOpenAI(api_key=api_key, base_url=base_url, timeout=timeout_sec)
             formatted_prompt = self.prompt_template.format(
                 dialect=dialect,
                 execution_plan=plan.model_dump_json(indent=2)

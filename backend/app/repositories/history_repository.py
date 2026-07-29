@@ -1,5 +1,5 @@
 from typing import List, Optional, Tuple
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.query_history import QueryHistory
 
@@ -21,7 +21,7 @@ class HistoryRepository:
         error: Optional[str] = None,
         insights_json: Optional[str] = None
     ) -> QueryHistory:
-        history = QueryHistory(
+        item = QueryHistory(
             user_id=user_id,
             connection_id=connection_id,
             user_query=user_query,
@@ -33,10 +33,10 @@ class HistoryRepository:
             error=error,
             insights_json=insights_json
         )
-        self.session.add(history)
+        self.session.add(item)
         await self.session.commit()
-        await self.session.refresh(history)
-        return history
+        await self.session.refresh(item)
+        return item
 
     async def get_by_id(self, history_id: int, user_id: int) -> Optional[QueryHistory]:
         stmt = select(QueryHistory).where(
@@ -53,16 +53,19 @@ class HistoryRepository:
         skip: int = 0,
         limit: int = 50
     ) -> Tuple[List[QueryHistory], int]:
-        query = select(QueryHistory).where(QueryHistory.user_id == user_id)
-        if connection_id is not None:
-            query = query.where(QueryHistory.connection_id == connection_id)
+        stmt = select(QueryHistory).where(QueryHistory.user_id == user_id)
+        count_stmt = select(func.count(QueryHistory.id)).where(QueryHistory.user_id == user_id)
 
-        count_stmt = select(func.count()).select_from(query.subquery())
+        if connection_id:
+            stmt = stmt.where(QueryHistory.connection_id == connection_id)
+            count_stmt = count_stmt.where(QueryHistory.connection_id == connection_id)
+
+        stmt = stmt.order_by(QueryHistory.created_at.desc()).offset(skip).limit(limit)
+
         total_res = await self.session.execute(count_stmt)
-        total = total_res.scalar_one() or 0
+        total = total_res.scalar_one()
 
-        items_stmt = query.order_by(QueryHistory.created_at.desc()).offset(skip).limit(limit)
-        items_res = await self.session.execute(items_stmt)
+        items_res = await self.session.execute(stmt)
         items = list(items_res.scalars().all())
 
         return items, total
@@ -78,8 +81,8 @@ class HistoryRepository:
     async def get_user_stats(self, user_id: int) -> dict:
         stmt = select(
             func.count(QueryHistory.id).label("total"),
-            func.sum(func.case((QueryHistory.status == "success", 1), else_=0)).label("success_count"),
-            func.sum(func.case((QueryHistory.status == "failed", 1), else_=0)).label("failed_count"),
+            func.sum(case((QueryHistory.status == "success", 1), else_=0)).label("success_count"),
+            func.sum(case((QueryHistory.status == "failed", 1), else_=0)).label("failed_count"),
             func.avg(QueryHistory.execution_time_ms).label("avg_time"),
             func.sum(QueryHistory.row_count).label("total_rows")
         ).where(QueryHistory.user_id == user_id)
@@ -87,11 +90,11 @@ class HistoryRepository:
         res = await self.session.execute(stmt)
         row = res.one()
 
-        total = row.total or 0
-        success_count = row.success_count or 0
-        failed_count = row.failed_count or 0
-        avg_time = float(row.avg_time or 0.0)
-        total_rows = row.total_rows or 0
+        total = row[0] or 0
+        success_count = row[1] or 0
+        failed_count = row[2] or 0
+        avg_time = float(row[3] or 0.0)
+        total_rows = row[4] or 0
 
         success_rate = (success_count / total * 100.0) if total > 0 else 0.0
 

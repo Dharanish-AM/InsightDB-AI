@@ -2,15 +2,26 @@ from typing import AsyncGenerator
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+# Import all models to populate Base.metadata before table creation
+from app.models.user import User  # noqa: F401
+from app.models.database_connection import DatabaseConnection  # noqa: F401
+from app.models.query_history import QueryHistory  # noqa: F401
+from app.models.schema_metadata import SchemaTable, SchemaColumn  # noqa: F401
+from app.models.business_metadata import TableAnnotation, ColumnAnnotation  # noqa: F401
+
 from app.database.base import Base
 from app.database.session import get_db
 from app.main import app
+
+from sqlalchemy.pool import StaticPool
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
 test_engine = create_async_engine(
     TEST_DATABASE_URL,
-    connect_args={"check_same_thread": False}
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool
 )
 
 TestAsyncSessionLocal = async_sessionmaker(

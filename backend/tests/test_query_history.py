@@ -1,7 +1,7 @@
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.models.database_connection import DatabaseConnection, DBType
+from app.models.database_connection import DatabaseConnection, DbType
 from app.models.user import User, UserRole
 from app.core.security import get_password_hash, create_access_token
 
@@ -22,10 +22,10 @@ async def test_query_history_flow(async_client: AsyncClient, db_session: AsyncSe
 
     conn = DatabaseConnection(
         name="History Test DB",
-        db_type=DBType.POSTGRESQL,
+        db_type=DbType.POSTGRESQL,
         host="localhost",
         port=5432,
-        database="test_db",
+        database_name="test_db",
         username="postgres",
         encrypted_password="secret_password",
         owner_id=user.id
@@ -34,7 +34,7 @@ async def test_query_history_flow(async_client: AsyncClient, db_session: AsyncSe
     await db_session.commit()
     await db_session.refresh(conn)
 
-    token = create_access_token(user.id)
+    token = create_access_token(user.id, user.role.value)
     headers = {"Authorization": f"Bearer {token}"}
 
     # Fetch initial history (should be empty)
