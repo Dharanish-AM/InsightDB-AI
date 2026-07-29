@@ -56,6 +56,7 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY:-ollama}
       - OPENAI_BASE_URL=${OPENAI_BASE_URL:-http://ollama:11434/v1}
       - LLM_MODEL_NAME=${LLM_MODEL_NAME:-llama3.2:1b}
+      - LLM_TIMEOUT=120.0
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
