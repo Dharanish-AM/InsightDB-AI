@@ -1,307 +1,261 @@
-import React, { useEffect, useState } from 'react';
-import { Clock, RefreshCw, Search, Trash2, ExternalLink, Code2 } from 'lucide-react';
+import React, { useState } from 'react';
+import {
+  Clock, Search, Trash2, RefreshCw, ChevronRight, CheckCircle, AlertTriangle
+} from 'lucide-react';
+import { useHistory, useHistoryStats } from '../hooks/useHistory';
+import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
-import { DatabaseConnection, HistoryStats, QueryHistoryItem } from '../types';
+import { Card } from './ui/Card';
+import { Badge } from './ui/Badge';
+import { Button } from './ui/Button';
+import { Drawer } from './ui/Drawer';
+import { EmptyState } from './ui/EmptyState';
+import toast from 'react-hot-toast';
 
-interface QueryHistoryProps {
-  connections: DatabaseConnection[];
-  onSelectQuery?: (sql: string, queryText: string) => void;
+interface QueryHistoryViewProps {
+  connections: any[];
+  onSelectQuery: (sql: string, queryText: string) => void;
 }
 
-export const QueryHistoryView: React.FC<QueryHistoryProps> = ({ connections, onSelectQuery }) => {
-  const [historyItems, setHistoryItems] = useState<QueryHistoryItem[]>([]);
-  const [stats, setStats] = useState<HistoryStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [selectedConnection, setSelectedConnection] = useState<number | undefined>(undefined);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedItem, setSelectedItem] = useState<QueryHistoryItem | null>(null);
+export function QueryHistoryView({ connections, onSelectQuery }: QueryHistoryViewProps) {
+  const { activeConnection } = useAuth();
+  const [search, setSearch] = useState('');
+  const [selectedConnectionId, setSelectedConnectionId] = useState<number | undefined>(activeConnection?.id);
+  const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const loadData = async () => {
-    setLoading(true);
+  const { data: historyData, isLoading, refetch } = useHistory(selectedConnectionId, 0, 50);
+  const { data: stats } = useHistoryStats();
+
+  const handleOpenDetail = async (item: any) => {
     try {
-      const [histData, statsData] = await Promise.all([
-        api.getHistory(selectedConnection),
-        api.getHistoryStats()
-      ]);
-      setHistoryItems(histData.items);
-      setStats(statsData);
-    } catch (err) {
-      console.error('Failed to load history data:', err);
-    } finally {
-      setLoading(false);
+      const detail = await api.getHistoryDetail(item.id);
+      setSelectedItem(detail);
+      setDrawerOpen(true);
+    } catch {
+      toast.error('Failed to load query details');
     }
   };
 
-  useEffect(() => {
-    loadData();
-  }, [selectedConnection]);
-
-  const handleDelete = async (id: number) => {
-    if (!confirm('Are you sure you want to delete this query history item?')) return;
+  const handleDeleteItem = async (e: React.MouseEvent, id: number) => {
+    e.stopPropagation();
     try {
       await api.deleteHistoryItem(id);
-      setHistoryItems(prev => prev.filter(item => item.id !== id));
-      if (selectedItem?.id === id) setSelectedItem(null);
-      const updatedStats = await api.getHistoryStats();
-      setStats(updatedStats);
-    } catch (err) {
-      alert('Failed to delete history item');
+      toast.success('Query removed from history');
+      refetch();
+    } catch {
+      toast.error('Failed to delete query history item');
     }
   };
 
-  const filteredItems = historyItems.filter(item =>
-    item.user_query.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (item.sanitized_sql && item.sanitized_sql.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const filteredItems = (historyData?.items ?? []).filter(item => {
+    const matchesSearch = item.user_query.toLowerCase().includes(search.toLowerCase()) || 
+      (item.generated_sql && item.generated_sql.toLowerCase().includes(search.toLowerCase()));
+    const matchesStatus = selectedStatus === 'all' || item.status === selectedStatus;
+    return matchesSearch && matchesStatus;
+  });
 
   return (
-    <div className="max-w-7xl mx-auto space-y-7">
+    <div className="space-y-6 animate-fade-in max-w-7xl">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <span className="eyebrow">Audit & History Logs</span>
-          <h1 className="page-title mt-2 flex items-center gap-2">
-            <Clock className="w-7 h-7 text-indigo-500" />
-            Query History & Analytics
-          </h1>
-          <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
-            Review previous AI queries, generated SQL, execution metrics, and analytical logs.
+          <p className="page-eyebrow mb-1.5">Audit & Logs</p>
+          <h1 className="page-title">Query History</h1>
+          <p className="mt-1.5 text-sm" style={{ color: 'var(--text-secondary)' }}>
+            Inspect query history, timing metrics, and reuse verified SQL statements.
           </p>
         </div>
-
-        <button
-          onClick={loadData}
-          className="btn-secondary px-4 py-2.5 whitespace-nowrap self-start sm:self-auto"
-        >
-          <RefreshCw className="w-4 h-4" />
-          <span>Refresh Log</span>
-        </button>
+        <Button variant="secondary" size="sm" icon={<RefreshCw className="w-3.5 h-3.5" />} onClick={() => refetch()}>
+          Refresh
+        </Button>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats row */}
       {stats && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="glass-panel p-5 rounded-2xl border" style={{ borderColor: 'var(--border-base)' }}>
-            <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Total Queries</div>
-            <div className="text-2xl font-bold mt-1" style={{ color: 'var(--text-primary)' }}>{stats.total_queries}</div>
-          </div>
-          <div className="glass-panel p-5 rounded-2xl border" style={{ borderColor: 'var(--border-base)' }}>
-            <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Success Rate</div>
-            <div className="text-2xl font-bold mt-1 text-emerald-500 dark:text-emerald-400">{stats.success_rate_percentage}%</div>
-          </div>
-          <div className="glass-panel p-5 rounded-2xl border" style={{ borderColor: 'var(--border-base)' }}>
-            <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Avg Latency</div>
-            <div className="text-2xl font-bold mt-1 text-indigo-500 dark:text-indigo-400">{stats.average_execution_time_ms} ms</div>
-          </div>
-          <div className="glass-panel p-5 rounded-2xl border" style={{ borderColor: 'var(--border-base)' }}>
-            <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Rows Processed</div>
-            <div className="text-2xl font-bold mt-1 text-sky-500 dark:text-sky-400">{stats.total_rows_fetched.toLocaleString()}</div>
-          </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card padding="sm">
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Total Executions</p>
+            <p className="text-2xl font-bold mt-1" style={{ color: 'var(--text-primary)' }}>{stats.total_queries}</p>
+          </Card>
+          <Card padding="sm">
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Success Rate</p>
+            <p className="text-2xl font-bold mt-1 text-emerald-400">{stats.success_rate_percentage.toFixed(1)}%</p>
+          </Card>
+          <Card padding="sm">
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Avg Latency</p>
+            <p className="text-2xl font-bold mt-1 text-sky-400">{stats.average_execution_time_ms.toFixed(0)}ms</p>
+          </Card>
+          <Card padding="sm">
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Total Rows Fetched</p>
+            <p className="text-2xl font-bold mt-1" style={{ color: 'var(--text-primary)' }}>{stats.total_rows_fetched.toLocaleString()}</p>
+          </Card>
         </div>
       )}
 
-      {/* Filters Bar */}
-      <div className="glass-panel p-4 rounded-2xl border flex flex-col sm:flex-row gap-3 items-center justify-between" style={{ borderColor: 'var(--border-base)' }}>
-        <div className="relative w-full sm:w-80">
-          <Search className="w-4 h-4 absolute left-3 top-3" style={{ color: 'var(--text-muted)' }} />
+      {/* Filter bar */}
+      <Card padding="sm" className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
           <input
-            type="text"
-            placeholder="Search query text or SQL..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="form-control has-leading-icon py-2.5 text-xs"
-            style={{ background: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search queries or SQL..."
+            className="form-input with-icon py-1.5 text-xs"
           />
         </div>
+        <select
+          value={selectedConnectionId ?? ''}
+          onChange={e => setSelectedConnectionId(e.target.value ? Number(e.target.value) : undefined)}
+          className="form-input text-xs w-[160px] py-1.5"
+        >
+          <option value="">All connections</option>
+          {connections.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+        <select
+          value={selectedStatus}
+          onChange={e => setSelectedStatus(e.target.value)}
+          className="form-input text-xs w-[120px] py-1.5"
+        >
+          <option value="all">All statuses</option>
+          <option value="success">Success</option>
+          <option value="failed">Failed</option>
+        </select>
+      </Card>
 
-        <div className="flex items-center gap-2.5 w-full sm:w-auto">
-          <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>Connection:</span>
-          <select
-            value={selectedConnection || ''}
-            onChange={e => setSelectedConnection(e.target.value ? Number(e.target.value) : undefined)}
-            className="form-control py-2 text-xs w-auto cursor-pointer"
-            style={{ background: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}
-          >
-            <option value="">All Databases</option>
-            {connections.map(c => (
-              <option key={c.id} value={c.id}>
-                {c.name} ({c.db_type})
-              </option>
-            ))}
-          </select>
+      {/* History list */}
+      {isLoading ? (
+        <div className="space-y-3">
+          {[...Array(5)].map((_, i) => <div key={i} className="skeleton h-16 rounded-xl" />)}
         </div>
-      </div>
+      ) : filteredItems.length === 0 ? (
+        <Card padding="none">
+          <EmptyState
+            icon={Clock}
+            title="No history found"
+            description="No queries match your current filter settings."
+          />
+        </Card>
+      ) : (
+        <Card padding="none">
+          <div className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
+            {filteredItems.map(item => (
+              <div
+                key={item.id}
+                onClick={() => handleOpenDetail(item)}
+                className="flex items-center justify-between gap-4 px-5 py-3.5 hover:bg-[var(--bg-tag)] cursor-pointer transition-colors"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div
+                    className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                    style={{
+                      background: item.status === 'success' ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
+                      color: item.status === 'success' ? 'var(--success)' : 'var(--danger)',
+                    }}
+                  >
+                    {item.status === 'success' ? <CheckCircle className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{item.user_query}</p>
+                    <div className="flex items-center gap-2 mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                      <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-tag)]">
+                        ID: {item.id}
+                      </span>
+                      <span>·</span>
+                      <span>{item.execution_time_ms}ms</span>
+                      <span>·</span>
+                      <span>{new Date(item.created_at).toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
 
-      {/* History Table */}
-      <div className="glass-panel rounded-2xl border overflow-hidden" style={{ borderColor: 'var(--border-base)' }}>
-        {loading ? (
-          <div className="p-12 text-center text-sm flex items-center justify-center gap-3" style={{ color: 'var(--text-secondary)' }}>
-            <span className="w-5 h-5 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
-            Loading query history...
+                <div className="flex items-center gap-2 shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="p-1"
+                    title="Delete"
+                    onClick={(e) => handleDeleteItem(e, item.id)}
+                  >
+                    <Trash2 className="w-4 h-4 text-rose-500" />
+                  </Button>
+                  <ChevronRight className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+                </div>
+              </div>
+            ))}
           </div>
-        ) : filteredItems.length === 0 ? (
-          <div className="p-12 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
-            No history entries found matching your filter criteria.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead className="font-semibold border-b uppercase tracking-wider" style={{ background: 'var(--bg-table-head)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}>
-                <tr>
-                  <th className="px-5 py-3.5">Status</th>
-                  <th className="px-5 py-3.5">Natural Language Query</th>
-                  <th className="px-5 py-3.5">Execution Time</th>
-                  <th className="px-5 py-3.5">Rows</th>
-                  <th className="px-5 py-3.5">Date</th>
-                  <th className="px-5 py-3.5 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y" style={{ background: 'var(--bg-table-row)', borderColor: 'var(--border-base)' }}>
-                {filteredItems.map(item => (
-                  <tr key={item.id} className="hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
-                    <td className="px-5 py-3.5 whitespace-nowrap">
-                      {item.status === 'success' ? (
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                          SUCCESS
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
-                          FAILED
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <div className="font-semibold line-clamp-1" style={{ color: 'var(--text-primary)' }}>{item.user_query}</div>
-                      {item.sanitized_sql && (
-                        <div className="code-font text-[11px] line-clamp-1 mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                          {item.sanitized_sql}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-5 py-3.5 code-font font-semibold" style={{ color: 'var(--text-primary)' }}>
-                      {item.execution_time_ms} ms
-                    </td>
-                    <td className="px-5 py-3.5 code-font font-semibold" style={{ color: 'var(--text-primary)' }}>
-                      {item.row_count}
-                    </td>
-                    <td className="px-5 py-3.5 whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
-                      {new Date(item.created_at).toLocaleString()}
-                    </td>
-                    <td className="px-5 py-3.5 text-right whitespace-nowrap space-x-2">
-                      <button
-                        onClick={() => setSelectedItem(item)}
-                        className="btn-secondary px-2.5 py-1 text-xs"
-                      >
-                        Inspect
-                      </button>
+        </Card>
+      )}
 
-                      {onSelectQuery && item.sanitized_sql && (
-                        <button
-                          onClick={() => onSelectQuery(item.sanitized_sql!, item.user_query)}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 transition-colors"
-                        >
-                          <Code2 className="w-3.5 h-3.5" />
-                          <span>Use SQL</span>
-                        </button>
-                      )}
+      {/* Details drawer */}
+      <Drawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        title="Query Execution Log"
+        width="lg"
+      >
+        {selectedItem && (
+          <div className="space-y-6">
+            <div>
+              <p className="field-label">Natural Language Question</p>
+              <p className="text-sm font-semibold mt-1" style={{ color: 'var(--text-primary)' }}>{selectedItem.user_query}</p>
+            </div>
 
-                      <button
-                        onClick={() => handleDelete(item.id)}
-                        className="p-1.5 rounded-lg transition-colors hover:bg-rose-500/10 hover:text-rose-500"
-                        style={{ color: 'var(--text-muted)' }}
-                        title="Delete record"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="field-label">Status</p>
+                <Badge variant={selectedItem.status === 'success' ? 'green' : 'red'}>
+                  {selectedItem.status.toUpperCase()}
+                </Badge>
+              </div>
+              <div>
+                <p className="field-label">Execution Time</p>
+                <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{selectedItem.execution_time_ms}ms</p>
+              </div>
+              <div>
+                <p className="field-label">Rows Returned</p>
+                <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{selectedItem.row_count}</p>
+              </div>
+              <div>
+                <p className="field-label">Date</p>
+                <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{new Date(selectedItem.created_at).toLocaleString()}</p>
+              </div>
+            </div>
+
+            {selectedItem.generated_sql && (
+              <div>
+                <p className="field-label">Generated Dialect SQL</p>
+                <div className="p-4 rounded-xl border mt-1.5 font-mono text-xs overflow-x-auto" style={{ background: 'var(--bg-code)', borderColor: 'var(--border-base)', color: 'var(--text-code)' }}>
+                  <pre>{selectedItem.generated_sql}</pre>
+                </div>
+                <div className="flex gap-2 mt-3">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    icon={<RefreshCw className="w-3.5 h-3.5" />}
+                    onClick={() => {
+                      onSelectQuery(selectedItem.generated_sql, selectedItem.user_query);
+                      setDrawerOpen(false);
+                    }}
+                  >
+                    Reuse Query Studio
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {selectedItem.error && (
+              <div>
+                <p className="field-label" style={{ color: 'var(--danger)' }}>Execution Error</p>
+                <div className="p-4 rounded-xl border border-red-500/20 text-xs text-red-400 mt-1.5 font-mono" style={{ background: 'rgba(239,68,68,0.06)' }}>
+                  {selectedItem.error}
+                </div>
+              </div>
+            )}
           </div>
         )}
-      </div>
-
-      {/* Inspect Modal */}
-      {selectedItem && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/75 backdrop-blur-md overflow-y-auto">
-          <div className="glass-panel rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl max-h-[85vh] flex flex-col border my-auto" style={{ borderColor: 'var(--border-strong)' }}>
-            <div className="p-5 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-base)', background: 'var(--bg-table-head)' }}>
-              <h3 className="font-bold text-base flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-                <ExternalLink className="w-4 h-4 text-violet-400" />
-                Query Log Inspection
-              </h3>
-              <button
-                onClick={() => setSelectedItem(null)}
-                className="w-8 h-8 rounded-lg grid place-items-center transition-colors hover:bg-black/10 dark:hover:bg-white/10"
-                style={{ color: 'var(--text-secondary)' }}
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="p-6 overflow-y-auto space-y-5 text-xs">
-              <div>
-                <label className="field-label">Natural Language Intent</label>
-                <p className="p-3.5 rounded-xl border font-medium text-sm" style={{ background: 'var(--bg-input)', borderColor: 'var(--border-base)', color: 'var(--text-primary)' }}>
-                  {selectedItem.user_query}
-                </p>
-              </div>
-
-              {selectedItem.sanitized_sql && (
-                <div>
-                  <label className="field-label">Sanitized Dialect SQL Query</label>
-                  <pre className="code-font text-xs p-4 rounded-xl border overflow-x-auto whitespace-pre-wrap leading-relaxed" style={{ background: 'var(--bg-code)', borderColor: 'var(--border-base)', color: 'var(--text-code)' }}>
-                    {selectedItem.sanitized_sql}
-                  </pre>
-                </div>
-              )}
-
-              {selectedItem.error && (
-                <div>
-                  <label className="field-label text-rose-500">Error Details</label>
-                  <p className="p-3.5 rounded-xl border bg-rose-500/10 text-rose-600 dark:text-rose-400 font-mono text-xs" style={{ borderColor: 'rgba(244,63,94,.3)' }}>
-                    {selectedItem.error}
-                  </p>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-3 pt-2">
-                <div className="p-3.5 rounded-xl border" style={{ background: 'var(--bg-input)', borderColor: 'var(--border-base)' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>Execution Latency:</span>
-                  <span className="code-font font-bold ml-2 text-indigo-500 dark:text-indigo-400">{selectedItem.execution_time_ms} ms</span>
-                </div>
-                <div className="p-3.5 rounded-xl border" style={{ background: 'var(--bg-input)', borderColor: 'var(--border-base)' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>Rows Returned:</span>
-                  <span className="code-font font-bold ml-2" style={{ color: 'var(--text-primary)' }}>{selectedItem.row_count}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-4 border-t flex items-center justify-between gap-2" style={{ borderColor: 'var(--border-base)', background: 'var(--bg-table-head)' }}>
-              {onSelectQuery && selectedItem.sanitized_sql ? (
-                <button
-                  onClick={() => {
-                    const item = selectedItem;
-                    setSelectedItem(null);
-                    onSelectQuery(item.sanitized_sql!, item.user_query);
-                  }}
-                  className="btn-primary px-4 py-2 text-xs"
-                >
-                  <Code2 className="w-4 h-4" />
-                  <span>Use in Studio</span>
-                </button>
-              ) : <div />}
-              <button
-                onClick={() => setSelectedItem(null)}
-                className="btn-secondary px-5 py-2 text-xs font-semibold"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      </Drawer>
     </div>
   );
-};
+}
